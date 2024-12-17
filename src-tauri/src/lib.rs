@@ -26,6 +26,7 @@ struct MenuState<R: Runtime> {
 fn handle_menu_event<R: Runtime>(app: &AppHandle<R>, id: &str, menu_state: &MenuState<R>) {
     match id {
         "quit" => {
+            println!("Quit menu item selected");
             app.exit(0);
         }
         "remove_silence" => {
@@ -50,7 +51,7 @@ fn handle_menu_event<R: Runtime>(app: &AppHandle<R>, id: &str, menu_state: &Menu
 fn create_tray_menu<R: Runtime>(app: &AppHandle<R>) -> (Menu<R>, HashMap<String, CheckMenuItem<R>>, Option<CheckMenuItem<R>>) {
     // Create quit menu item
     let separator = PredefinedMenuItem::separator(app).unwrap();
-    let quit = MenuItem::new(app, "Quit".to_string(), true, None::<String>).unwrap();
+    let quit = MenuItem::with_id(app, "quit", "Quit".to_string(), true, None::<String>).unwrap();
 
     // Initialize config manager and load audio configuration
     let config_manager = ConfigManager::<AudioConfig>::new("audio").expect("Failed to create config manager");
