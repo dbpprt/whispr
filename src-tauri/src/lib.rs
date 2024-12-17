@@ -1,7 +1,35 @@
+/*
+Implementation Plan for Exclusive Audio Source Selection:
+
+[ ] 1. Menu Structure Enhancement
+    - Ensure audio devices are properly grouped in submenu
+    - Verify menu item creation with proper IDs and states
+
+[ ] 2. State Management
+    - Track currently selected audio source
+    - Maintain CheckMenuItem references for state updates
+
+[ ] 3. Selection Logic
+    - Implement exclusive selection in handle_audio_device_selection
+    - Uncheck all other sources when one is selected
+    - Update audio manager with new selection
+
+[ ] 4. Error Handling
+    - Add proper error handling for device switching
+    - Maintain menu state consistency on errors
+    - Log errors for debugging
+
+[ ] 5. Testing
+    - Verify only one source can be active
+    - Test device switching behavior
+    - Ensure menu state reflects actual device state
+*/
+
 use tauri::{
     AppHandle, Manager, Runtime,
     menu::{Menu, MenuItem, Submenu, CheckMenuItem},
     tray::TrayIconBuilder,
+    State,
 };
 mod hotkey;
 mod window;
@@ -12,6 +40,12 @@ use window::OverlayWindow;
 use audio::AudioManager;
 use std::sync::Mutex;
 use std::collections::HashMap;
+
+// State struct to hold menu items
+#[derive(Default)]
+struct MenuState<R: Runtime> {
+    audio_device_map: Mutex<HashMap<String, CheckMenuItem<R>>>,
+}
 
 fn handle_menu_event<R: Runtime>(app: &AppHandle<R>, id: &str) {
     match id {
@@ -65,19 +99,22 @@ fn create_tray_menu<R: Runtime>(app: &AppHandle<R>) -> (Menu<R>, HashMap<String,
     (Menu::with_items(app, &main_items).unwrap(), audio_device_map)
 }
 
-fn handle_audio_device_selection<R: Runtime>(app: &AppHandle<R>, id: &str, audio_device_map: &HashMap<String, CheckMenuItem<R>>) {
+fn handle_audio_device_selection<R: Runtime>(app: AppHandle<R>, id: &str, audio_device_map: &HashMap<String, CheckMenuItem<R>>) {
     if let Some(audio_state) = app.try_state::<Mutex<AudioManager>>() {
         let mut audio_manager = audio_state.lock().unwrap();
         if let Err(e) = audio_manager.set_input_device(id) {
             eprintln!("Failed to set input device: {}", e);
-        } else {
-            // Uncheck all devices
-            for item in audio_device_map.values() {
-                item.set_checked(false).unwrap();
+            // Ensure menu state remains consistent with actual device state
+            if let Ok(current_device) = audio_manager.get_current_device_name() {
+                // Reset all checkmarks
+                for (device_id, item) in audio_device_map {
+                    item.set_checked(device_id == &current_device).unwrap();
+                }
             }
-            // Check the selected device
-            if let Some(item) = audio_device_map.get(id) {
-                item.set_checked(true).unwrap();
+        } else {
+            // Successfully changed device - update menu state
+            for (device_id, item) in audio_device_map {
+                item.set_checked(device_id == id).unwrap();
             }
         }
     }
@@ -85,11 +122,16 @@ fn handle_audio_device_selection<R: Runtime>(app: &AppHandle<R>, id: &str, audio
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::<Wry<EventLoopMessage>>::default()
+    tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .setup(|app| {
             let handle = app.handle();
             let (tray_menu, audio_device_map) = create_tray_menu(&handle);
+            
+            // Store menu state
+            app.manage(MenuState { 
+                audio_device_map: Mutex::new(audio_device_map)
+            });
             
             // Create and store the overlay window
             let mut overlay_window = OverlayWindow::new();
@@ -136,14 +178,17 @@ pub fn run() {
                 return Err(e.into());
             }
             
-            // Create system tray
+            // Create system tray with audio device menu
+            let handle_clone = handle.clone();
             let tray = TrayIconBuilder::new()
                 .icon(handle.default_window_icon().unwrap().clone())
                 .menu(&tray_menu)
                 .on_menu_event(move |app, event| {
-                    handle_audio_device_selection(app, &event.id().0, &audio_device_map);
+                    let menu_state = handle_clone.state::<MenuState<_>>();
+                    let audio_device_map = menu_state.audio_device_map.lock().unwrap();
+                    handle_audio_device_selection(app.clone(), &event.id().0, &audio_device_map);
                 })
-                .build(&handle)?;
+                .build(handle)?;
             
             app.manage(tray);
             Ok(())
