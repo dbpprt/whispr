@@ -34,3 +34,5 @@ block = "0.1"
 libc = "0.2"
 once_cell = "1.19"
 hound = "3.5"  # For WAV file handling
+tempfile = "3.3.0"  # For creating temporary files in tests
+dirs = "4.0.0"  # For accessing standard directories like home directory
