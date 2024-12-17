@@ -13,16 +13,17 @@
     "withGlobalTauri": true,
     "windows": [
       {
-        "label": "overlay",
-        "url": "index.html",
-        "transparent": true,
+        "label": "main",
+        "title": "Whispr",
+        "width": 300,
+        "height": 40,
         "decorations": false,
+        "transparent": true,
         "alwaysOnTop": true,
         "skipTaskbar": true,
+        "visible": false,
         "center": true,
-        "width": 400,
-        "height": 300,
-        "visible": false
+        "url": "http://localhost:1420"
       }
     ],
     "security": {

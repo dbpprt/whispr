@@ -27,7 +27,7 @@ impl HotkeyManager {
             callback: Arc::new(callback),
         }
     }
-
+    
     pub fn start(&mut self) -> Result<()> {
         println!("HotkeyManager: Starting event monitor");
         let callback = self.callback.clone();

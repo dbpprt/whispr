@@ -54,18 +54,21 @@ Prefix tasks with "DONE: " if done.
    - DONE: Add error handling for hotkey conflicts
 
 3.3. Overlay Window
-   - Design overlay window UI
-   - Implement window manager
-   - Add window positioning logic
-   - Configure window styling (transparency, blur)
-   - Implement show/hide animations
+   - DONE: Design overlay window UI
+   - DONE: Extend window manager accordingly
+   - DONE: Add window positioning logic
+   - DONE: Configure window styling (transparency, blur)
+   - DONE: Implement show/hide animations
 
 3.4. Audio Capture System
    - Implement audio device detection
    - Set up audio capture pipeline
    - Create audio buffer management
    - Implement push-to-talk logic
+
+3.5. Audio Enhancements
    - Add audio level visualization
+   - Remove silence to prevent hallucination from the model
 
 ## 4. Whisper.cpp Integration
 4.1. Whisper Setup

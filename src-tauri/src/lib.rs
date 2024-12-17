@@ -5,10 +5,13 @@ use tauri::{
 };
 
 mod hotkey;
-use hotkey::HotkeyManager;
+mod window;
+mod audio;
 
-#[derive(Default)]
-struct AppState;
+use hotkey::HotkeyManager;
+use window::OverlayWindow;
+use audio::AudioManager;
+use std::sync::Mutex;
 
 fn handle_menu_event<R: Runtime>(app: &AppHandle<R>, id: &str) {
     match id {
@@ -32,9 +35,43 @@ pub fn run() {
             let handle = app.handle();
             let tray_menu = create_tray_menu(&handle);
             
-            // Initialize hotkey manager
-            let mut hotkey_manager = HotkeyManager::new(|is_speaking| {
+            // Create and store the overlay window
+            let mut overlay_window = OverlayWindow::new();
+            overlay_window.create_window(&handle);
+            let overlay_window = Mutex::new(overlay_window);
+            app.manage(overlay_window);
+            
+            // Initialize audio manager
+            let audio_manager = AudioManager::new().expect("Failed to initialize audio manager");
+            let audio_manager = Mutex::new(audio_manager);
+            app.manage(audio_manager);
+            
+            // Initialize hotkey manager with window and audio control
+            let app_handle = handle.clone();
+            let mut hotkey_manager = HotkeyManager::new(move |is_speaking| {
                 println!("Speaking state changed: {}", is_speaking);
+                
+                // Control window visibility
+                if let Some(window_state) = app_handle.try_state::<Mutex<OverlayWindow>>() {
+                    let window = window_state.lock().unwrap();
+                    if is_speaking {
+                        window.show();
+                    } else {
+                        window.hide();
+                    }
+                }
+
+                // Control audio capture
+                if let Some(audio_state) = app_handle.try_state::<Mutex<AudioManager>>() {
+                    let mut audio = audio_state.lock().unwrap();
+                    if is_speaking {
+                        if let Err(e) = audio.start_capture() {
+                            eprintln!("Failed to start audio capture: {}", e);
+                        }
+                    } else {
+                        audio.stop_capture();
+                    }
+                }
             });
 
             // Start the hotkey manager
@@ -43,9 +80,7 @@ pub fn run() {
                 return Err(e.into());
             }
             
-            // Store app state
-            app.manage(AppState::default());
-            
+            // Create system tray
             let tray = TrayIconBuilder::new()
                 .icon(handle.default_window_icon().unwrap().clone())
                 .menu(&tray_menu)
