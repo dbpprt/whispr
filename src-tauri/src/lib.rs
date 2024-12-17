@@ -11,6 +11,8 @@ use hotkey::HotkeyManager;
 use window::OverlayWindow;
 use audio::AudioManager;
 use std::sync::Mutex;
+use std::collections::HashMap;
+use tauri_runtime_wry::{Wry, EventLoopMessage};
 
 fn handle_menu_event<R: Runtime>(app: &AppHandle<R>, id: &str) {
     match id {
@@ -21,19 +23,21 @@ fn handle_menu_event<R: Runtime>(app: &AppHandle<R>, id: &str) {
     }
 }
 
-fn create_tray_menu<R: Runtime>(app: &AppHandle<R>) -> Menu<R> {
+fn create_tray_menu<R: Runtime>(app: &AppHandle<R>) -> (Menu<R>, HashMap<String, CheckMenuItem<R>>) {
     // Create quit menu item
     let quit = MenuItem::new(app, "Quit".to_string(), true, None::<String>).unwrap();
 
     // Create audio device menu items
     let mut audio_device_items = Vec::new();
+    let mut audio_device_map = HashMap::new();
     if let Ok(audio_manager) = AudioManager::new() {
         if let Ok(devices) = audio_manager.list_input_devices() {
             if let Ok(active_device_name) = audio_manager.get_current_device_name() {
                 for device in devices {
                     let is_active = device == active_device_name;
                     let item = CheckMenuItem::with_id(app, &device, &device, true, is_active, None::<String>).unwrap();
-                    audio_device_items.push(item);
+                    audio_device_items.push(item.clone());
+                    audio_device_map.insert(device.to_string(), item);
                 }
             } else {
                 eprintln!("Failed to get current device name");
@@ -42,8 +46,7 @@ fn create_tray_menu<R: Runtime>(app: &AppHandle<R>) -> Menu<R> {
     }
 
     // Convert audio device items to IsMenuItem trait objects
-    let audio_device_refs: Vec<&dyn tauri::menu::IsMenuItem<R>> = audio_device_items
-        .iter()
+    let audio_device_refs: Vec<&dyn tauri::menu::IsMenuItem<R>> = audio_device_items.iter()
         .map(|item| item as &dyn tauri::menu::IsMenuItem<R>)
         .collect();
 
@@ -60,25 +63,34 @@ fn create_tray_menu<R: Runtime>(app: &AppHandle<R>) -> Menu<R> {
         &quit,
         &audio_submenu
     ];
-    Menu::with_items(app, &main_items).unwrap()
+    (Menu::with_items(app, &main_items).unwrap(), audio_device_map)
 }
 
-fn handle_audio_device_selection<R: Runtime>(app: &AppHandle<R>, id: &str) {
+fn handle_audio_device_selection<R: Runtime>(app: &AppHandle<R>, id: &str, audio_device_map: &HashMap<String, CheckMenuItem<R>>) {
     if let Some(audio_state) = app.try_state::<Mutex<AudioManager>>() {
         let mut audio_manager = audio_state.lock().unwrap();
         if let Err(e) = audio_manager.set_input_device(id) {
             eprintln!("Failed to set input device: {}", e);
+        } else {
+            // Uncheck all devices
+            for item in audio_device_map.values() {
+                item.set_checked(false).unwrap();
+            }
+            // Check the selected device
+            if let Some(item) = audio_device_map.get(id) {
+                item.set_checked(true).unwrap();
+            }
         }
     }
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    tauri::Builder::<Wry<EventLoopMessage>>::default()
         .plugin(tauri_plugin_shell::init())
         .setup(|app| {
             let handle = app.handle();
-            let tray_menu = create_tray_menu(&handle);
+            let (tray_menu, audio_device_map) = create_tray_menu(&handle);
             
             // Create and store the overlay window
             let mut overlay_window = OverlayWindow::new();
@@ -129,10 +141,10 @@ pub fn run() {
             let tray = TrayIconBuilder::new()
                 .icon(handle.default_window_icon().unwrap().clone())
                 .menu(&tray_menu)
-                .on_menu_event(|app, event| {
-                    handle_audio_device_selection(app, &event.id().0);
+                .on_menu_event(move |app, event| {
+                    handle_audio_device_selection(app, &event.id().0, &audio_device_map);
                 })
-                .build(app)?;
+                .build(&handle)?;
             
             app.manage(tray);
             Ok(())
