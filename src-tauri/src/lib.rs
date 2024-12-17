@@ -12,7 +12,6 @@ use window::OverlayWindow;
 use audio::AudioManager;
 use std::sync::Mutex;
 use std::collections::HashMap;
-use tauri_runtime_wry::{Wry, EventLoopMessage};
 
 fn handle_menu_event<R: Runtime>(app: &AppHandle<R>, id: &str) {
     match id {
