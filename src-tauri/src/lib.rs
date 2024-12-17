@@ -1,9 +1,10 @@
 use tauri::{
     AppHandle, Manager, Runtime,
-    menu::{Menu, MenuItem, Submenu, CheckMenuItem},
+    menu::{Menu, MenuItem, Submenu, CheckMenuItem, PredefinedMenuItem},
     tray::TrayIconBuilder,
     State,
 };
+
 mod hotkey;
 mod window;
 mod audio;
@@ -18,6 +19,7 @@ use std::collections::HashMap;
 #[derive(Default)]
 struct MenuState<R: Runtime> {
     audio_device_map: Mutex<HashMap<String, CheckMenuItem<R>>>,
+    remove_silence_item: Option<CheckMenuItem<R>>,
 }
 
 fn handle_menu_event<R: Runtime>(app: &AppHandle<R>, id: &str) {
@@ -29,25 +31,26 @@ fn handle_menu_event<R: Runtime>(app: &AppHandle<R>, id: &str) {
     }
 }
 
-fn create_tray_menu<R: Runtime>(app: &AppHandle<R>) -> (Menu<R>, HashMap<String, CheckMenuItem<R>>) {
+fn create_tray_menu<R: Runtime>(app: &AppHandle<R>) -> (Menu<R>, HashMap<String, CheckMenuItem<R>>, Option<CheckMenuItem<R>>) {
     // Create quit menu item
+    let separator = PredefinedMenuItem::separator(app).unwrap();
     let quit = MenuItem::new(app, "Quit".to_string(), true, None::<String>).unwrap();
 
     // Create audio device menu items
     let mut audio_device_items = Vec::new();
     let mut audio_device_map = HashMap::new();
-    if let Ok(audio_manager) = AudioManager::new() {
-        if let Ok(devices) = audio_manager.list_input_devices() {
-            if let Ok(active_device_name) = audio_manager.get_current_device_name() {
-                for device in devices {
-                    let is_active = device == active_device_name;
-                    let item = CheckMenuItem::with_id(app, &device, &device, true, is_active, None::<String>).unwrap();
-                    audio_device_items.push(item.clone());
-                    audio_device_map.insert(device.to_string(), item);
-                }
-            } else {
-                eprintln!("Failed to get current device name");
+    let audio_manager = AudioManager::new().unwrap();
+    
+    if let Ok(devices) = audio_manager.list_input_devices() {
+        if let Ok(active_device_name) = audio_manager.get_current_device_name() {
+            for device in devices {
+                let is_active = device == active_device_name;
+                let item = CheckMenuItem::with_id(app, &device, &device, true, is_active, None::<String>).unwrap();
+                audio_device_items.push(item.clone());
+                audio_device_map.insert(device.to_string(), item);
             }
+        } else {
+            eprintln!("Failed to get current device name");
         }
     }
 
@@ -64,12 +67,25 @@ fn create_tray_menu<R: Runtime>(app: &AppHandle<R>) -> (Menu<R>, HashMap<String,
         &audio_device_refs
     ).unwrap();
 
+    // Create remove silence menu item with explicit ID and sync initial state with audio manager
+    let initial_remove_silence_state = audio_manager.is_silence_removal_enabled();
+    let remove_silence_item = CheckMenuItem::with_id(
+        app, 
+        "remove_silence", 
+        "Remove Silence", 
+        true, 
+        initial_remove_silence_state, 
+        None::<String>
+    ).unwrap();
+    
     // Create the main menu with all items
     let main_items: Vec<&dyn tauri::menu::IsMenuItem<R>> = vec![
         &quit,
-        &audio_submenu
+        &separator,
+        &audio_submenu,
+        &remove_silence_item
     ];
-    (Menu::with_items(app, &main_items).unwrap(), audio_device_map)
+    (Menu::with_items(app, &main_items).unwrap(), audio_device_map, Some(remove_silence_item))
 }
 
 fn handle_audio_device_selection<R: Runtime>(app: AppHandle<R>, id: &str, audio_device_map: &HashMap<String, CheckMenuItem<R>>) {
@@ -93,17 +109,31 @@ fn handle_audio_device_selection<R: Runtime>(app: AppHandle<R>, id: &str, audio_
     }
 }
 
+fn handle_remove_silence_selection<R: Runtime>(app: AppHandle<R>, remove_silence_item: &CheckMenuItem<R>) {
+    if let Some(audio_state) = app.try_state::<Mutex<AudioManager>>() {
+        let mut audio_manager = audio_state.lock().unwrap();
+        let current_state = audio_manager.is_silence_removal_enabled();
+        let new_state = !current_state;
+        
+        println!("Remove Silence before toggle: {}", current_state);
+        audio_manager.set_remove_silence(new_state);
+        remove_silence_item.set_checked(new_state).unwrap();
+        println!("Remove Silence after toggle: {}", new_state);
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .setup(|app| {
             let handle = app.handle();
-            let (tray_menu, audio_device_map) = create_tray_menu(&handle);
+            let (tray_menu, audio_device_map, remove_silence_item) = create_tray_menu(&handle);
             
             // Store menu state
             app.manage(MenuState { 
-                audio_device_map: Mutex::new(audio_device_map)
+                audio_device_map: Mutex::new(audio_device_map),
+                remove_silence_item,
             });
             
             // Create and store the overlay window
@@ -157,9 +187,18 @@ pub fn run() {
                 .icon(handle.default_window_icon().unwrap().clone())
                 .menu(&tray_menu)
                 .on_menu_event(move |app, event| {
+                    println!("Menu item clicked: {:?}", event.id());
                     let menu_state = handle_clone.state::<MenuState<_>>();
                     let audio_device_map = menu_state.audio_device_map.lock().unwrap();
-                    handle_audio_device_selection(app.clone(), &event.id().0, &audio_device_map);
+                    if event.id() == "remove_silence" {
+                        if let Some(remove_silence_item) = &menu_state.remove_silence_item {
+                            handle_remove_silence_selection(app.clone(), remove_silence_item);
+                        }
+                    } else if audio_device_map.contains_key(&event.id().0) {
+                        handle_audio_device_selection(app.clone(), &event.id().0, &audio_device_map);
+                    } else {
+                        println!("Unhandled menu item: {:?}", event.id());
+                    }
                 })
                 .build(handle)?;
             

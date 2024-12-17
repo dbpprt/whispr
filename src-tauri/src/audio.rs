@@ -82,6 +82,10 @@ impl AudioManager {
         }
     }
 
+    pub fn is_silence_removal_enabled(&self) -> bool {
+        self.silence_config.lock().unwrap().enabled
+    }
+
     pub fn list_input_devices(&self) -> Result<Vec<String>> {
         let devices = self.host.input_devices()?;
         let mut device_names = Vec::new();
@@ -198,6 +202,10 @@ impl AudioManager {
         )?;
 
         Ok(stream)
+    }
+
+    pub fn set_remove_silence(&mut self, remove_silence: bool) {
+        self.configure_silence_removal(remove_silence, None, None);
     }
 }
 
