@@ -1,30 +1,3 @@
-/*
-Implementation Plan for Exclusive Audio Source Selection:
-
-[ ] 1. Menu Structure Enhancement
-    - Ensure audio devices are properly grouped in submenu
-    - Verify menu item creation with proper IDs and states
-
-[ ] 2. State Management
-    - Track currently selected audio source
-    - Maintain CheckMenuItem references for state updates
-
-[ ] 3. Selection Logic
-    - Implement exclusive selection in handle_audio_device_selection
-    - Uncheck all other sources when one is selected
-    - Update audio manager with new selection
-
-[ ] 4. Error Handling
-    - Add proper error handling for device switching
-    - Maintain menu state consistency on errors
-    - Log errors for debugging
-
-[ ] 5. Testing
-    - Verify only one source can be active
-    - Test device switching behavior
-    - Ensure menu state reflects actual device state
-*/
-
 use tauri::{
     AppHandle, Manager, Runtime,
     menu::{Menu, MenuItem, Submenu, CheckMenuItem},
