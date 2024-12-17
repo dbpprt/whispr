@@ -1,6 +1,6 @@
 use tauri::{
     AppHandle, Manager, Runtime,
-    menu::{Menu, MenuItem, Submenu},
+    menu::{Menu, MenuItem, Submenu, CheckMenuItem},
     tray::TrayIconBuilder,
 };
 mod hotkey;
@@ -29,9 +29,14 @@ fn create_tray_menu<R: Runtime>(app: &AppHandle<R>) -> Menu<R> {
     let mut audio_device_items = Vec::new();
     if let Ok(audio_manager) = AudioManager::new() {
         if let Ok(devices) = audio_manager.list_input_devices() {
-            for device in devices {
-                let item = MenuItem::with_id(app, &device, &device, true, None::<String>).unwrap();
-                audio_device_items.push(item);
+            if let Ok(active_device_name) = audio_manager.get_current_device_name() {
+                for device in devices {
+                    let is_active = device == active_device_name;
+                    let item = CheckMenuItem::with_id(app, &device, &device, true, is_active, None::<String>).unwrap();
+                    audio_device_items.push(item);
+                }
+            } else {
+                eprintln!("Failed to get current device name");
             }
         }
     }
