@@ -113,6 +113,7 @@ pub struct AudioConfig {
     pub remove_silence: bool,
     pub silence_threshold: f32,
     pub min_silence_duration: usize,
+    pub developer_options: DeveloperConfig,
 }
 
 impl Default for AudioConfig {
@@ -122,6 +123,20 @@ impl Default for AudioConfig {
             remove_silence: false,
             silence_threshold: 0.01,
             min_silence_duration: 1000,
+            developer_options: DeveloperConfig::default(),
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DeveloperConfig {
+    pub save_recordings: bool,
+}
+
+impl Default for DeveloperConfig {
+    fn default() -> Self {
+        Self {
+            save_recordings: false,
         }
     }
 }

@@ -10,12 +10,9 @@ use crate::{
 
 pub fn initialize_app(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
     let app_handle = app.handle();
-    let (tray_menu, audio_device_map, remove_silence_item) = create_tray_menu(&app_handle);
+    let (tray_menu, _, menu_state) = create_tray_menu(&app_handle);
     
-    app.manage(MenuState { 
-        audio_device_map: Mutex::new(audio_device_map),
-        remove_silence_item,
-    });
+    app.manage(menu_state);
     
     let mut overlay_window = OverlayWindow::new();
     overlay_window.create_window(&app_handle);
