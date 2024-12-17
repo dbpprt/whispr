@@ -1,9 +1,8 @@
 use tauri::{
     AppHandle, Manager, Runtime,
-    menu::{Menu, MenuItem},
+    menu::{Menu, MenuItem, Submenu},
     tray::TrayIconBuilder,
 };
-
 mod hotkey;
 mod window;
 mod audio;
@@ -23,8 +22,49 @@ fn handle_menu_event<R: Runtime>(app: &AppHandle<R>, id: &str) {
 }
 
 fn create_tray_menu<R: Runtime>(app: &AppHandle<R>) -> Menu<R> {
-    let quit = MenuItem::with_id(app, "quit", "Quit", true, Some("")).unwrap();
-    Menu::with_items(app, &[&quit]).unwrap()
+    // Create quit menu item
+    let quit = MenuItem::new(app, "Quit".to_string(), true, None::<String>).unwrap();
+
+    // Create audio device menu items
+    let mut audio_device_items = Vec::new();
+    if let Ok(audio_manager) = AudioManager::new() {
+        if let Ok(devices) = audio_manager.list_input_devices() {
+            for device in devices {
+                let item = MenuItem::with_id(app, &device, &device, true, None::<String>).unwrap();
+                audio_device_items.push(item);
+            }
+        }
+    }
+
+    // Convert audio device items to IsMenuItem trait objects
+    let audio_device_refs: Vec<&dyn tauri::menu::IsMenuItem<R>> = audio_device_items
+        .iter()
+        .map(|item| item as &dyn tauri::menu::IsMenuItem<R>)
+        .collect();
+
+    // Create the audio device submenu
+    let audio_submenu = Submenu::with_items(
+        app,
+        "Audio Device",
+        true,
+        &audio_device_refs
+    ).unwrap();
+
+    // Create the main menu with all items
+    let main_items: Vec<&dyn tauri::menu::IsMenuItem<R>> = vec![
+        &quit,
+        &audio_submenu
+    ];
+    Menu::with_items(app, &main_items).unwrap()
+}
+
+fn handle_audio_device_selection<R: Runtime>(app: &AppHandle<R>, id: &str) {
+    if let Some(audio_state) = app.try_state::<Mutex<AudioManager>>() {
+        let mut audio_manager = audio_state.lock().unwrap();
+        if let Err(e) = audio_manager.set_input_device(id) {
+            eprintln!("Failed to set input device: {}", e);
+        }
+    }
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -85,10 +125,10 @@ pub fn run() {
                 .icon(handle.default_window_icon().unwrap().clone())
                 .menu(&tray_menu)
                 .on_menu_event(|app, event| {
-                    handle_menu_event(app, &event.id().0);
+                    handle_audio_device_selection(app, &event.id().0);
                 })
-                .build(handle)?;
-
+                .build(app)?;
+            
             app.manage(tray);
             Ok(())
         })
