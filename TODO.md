@@ -61,10 +61,10 @@ Prefix tasks with "DONE: " if done.
    - DONE: Implement show/hide animations
 
 3.4. Audio Capture System
-   - Implement audio device detection
-   - Set up audio capture pipeline
-   - Create audio buffer management
-   - Implement push-to-talk logic
+   - DONE: Implement audio device detection
+   - DONE: Set up audio capture pipeline
+   - DONE: Create audio buffer management
+   - DONE: Implement push-to-talk logic
 
 3.5. Audio Enhancements
    - Add audio level visualization
