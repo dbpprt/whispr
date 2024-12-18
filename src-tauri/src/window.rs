@@ -1,3 +1,4 @@
+use samplerate::Error;
 use tauri::{Window, Manager, Position};
 use tauri_plugin_positioner::{WindowExt, Position as PositionerPosition};
 
@@ -22,6 +23,12 @@ impl OverlayWindow {
         // Get the predefined window
         if let Some(window) = app_handle.get_window("main") {
             println!("Window found successfully");
+            
+            // Set window to be non-interactive
+            if let Err(e) = window.set_decorations(false) {
+                eprintln!("Failed to set window decorations: {}", e);
+            }
+            
             self.window = Some(window);
         } else {
             eprintln!("Failed to get main window");
@@ -34,6 +41,15 @@ impl OverlayWindow {
             // Move window to top-right position
             if let Err(e) = window.move_window(PositionerPosition::TopRight) {
                 eprintln!("Failed to position window: {}", e);
+            }
+
+            // Set window to skip taskbar
+            if let Err(e) = window.set_skip_taskbar(true) {
+                eprintln!("Failed to set skip taskbar: {}", e);
+            }
+
+            if let Err(e) = window.set_ignore_cursor_events(true) {
+                eprintln!("Failed to set skip taskbar: {}", e);
             }
 
             // Show window
