@@ -1,4 +1,4 @@
-use whisper_rs::{WhisperContext, WhisperContextParameters, FullParams, SamplingStrategy, WhisperLogCallback};
+use whisper_rs::{WhisperContext, WhisperContextParameters, FullParams, SamplingStrategy};
 use crate::config::WhisprConfig;
 use std::sync::Arc;
 use std::result::Result;
@@ -26,7 +26,7 @@ impl WhisperProcessor {
             model_path.to_str().ok_or_else(|| "Invalid model path".to_string())?,
             WhisperContextParameters::default()
         ).map_err(|e| e.to_string())?;
-
+        
         Ok(Self {
             ctx: Arc::new(ctx),
             config,
@@ -40,13 +40,13 @@ impl WhisperProcessor {
 
         let mut state = self.ctx.create_state()
             .map_err(|e| e.to_string())?;
-
+        
         state.full(params, &captured_audio[..])
             .map_err(|e| e.to_string())?;
-
+        
         let num_segments = state.full_n_segments()
             .map_err(|e| e.to_string())?;
-
+        
         let mut segments = Vec::new();
         for i in 0..num_segments {
             let segment = state.full_get_segment_text(i)

@@ -289,7 +289,7 @@ fn handle_remove_silence_selection<R: Runtime>(app: &AppHandle<R>, remove_silenc
     }
 }
 
-fn handle_save_recordings_selection<R: Runtime>(app: &AppHandle<R>, save_recordings_item: &CheckMenuItem<R>) {
+fn handle_save_recordings_selection<R: Runtime>(_app: &AppHandle<R>, save_recordings_item: &CheckMenuItem<R>) {
     let config_manager = ConfigManager::<WhisprConfig>::new("settings").expect("Failed to create config manager");
     let mut whispr_config = WhisprConfig::default();
     
@@ -313,7 +313,7 @@ fn handle_save_recordings_selection<R: Runtime>(app: &AppHandle<R>, save_recordi
     }
 }
 
-fn handle_whisper_logging_selection<R: Runtime>(app: &AppHandle<R>, whisper_logging_item: &CheckMenuItem<R>) { // New function for Whisper logging
+fn handle_whisper_logging_selection<R: Runtime>(_app: &AppHandle<R>, whisper_logging_item: &CheckMenuItem<R>) { // New function for Whisper logging
     let config_manager = ConfigManager::<WhisprConfig>::new("settings").expect("Failed to create config manager");
     let mut whispr_config = WhisprConfig::default();
     
@@ -360,7 +360,7 @@ fn handle_language_selection<R: Runtime>(app: &AppHandle<R>, _item: CheckMenuIte
     }
 }
 
-fn handle_translate_selection<R: Runtime>(app: &AppHandle<R>, translate_item: &CheckMenuItem<R>) {
+fn handle_translate_selection<R: Runtime>(_app: &AppHandle<R>, translate_item: &CheckMenuItem<R>) {
     let config_manager = ConfigManager::<WhisprConfig>::new("settings").expect("Failed to create config manager");
     let mut whispr_config = WhisprConfig::default();
     

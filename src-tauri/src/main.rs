@@ -8,10 +8,10 @@ mod config;
 mod menu;
 mod whisper;
 
-use tauri::{Manager, App, AppHandle, Runtime, Wry, Emitter};
-use std::sync::{Arc, Mutex};
+use tauri::{Manager, App, Wry, Emitter};
+use std::sync::Mutex;
 use std::path::Path;
-use enigo::{Enigo, Key, Keyboard, Settings};
+use enigo::{Enigo, Keyboard, Settings};
 use crate::{
     audio::AudioManager,
     window::OverlayWindow,
