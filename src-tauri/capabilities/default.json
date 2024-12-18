@@ -15,6 +15,7 @@
     "core:tray:allow-set-menu",
     "global-shortcut:default",
     "shell:allow-open",
-    "shell:default"
+    "shell:default",
+    "positioner:default"
   ]
 }

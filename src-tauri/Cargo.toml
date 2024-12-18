@@ -16,6 +16,7 @@ tauri-build = { version = "2", features = [] }
 tauri = { version = "2", features = [ "macos-private-api", "tray-icon", "unstable" ] }
 tauri-plugin-shell = { version = "2" }
 tauri-plugin-global-shortcut = { git = "https://github.com/tauri-apps/plugins-workspace", branch = "v2" }
+tauri-plugin-positioner = "2.2.0"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio = { version = "1", features = ["full"] }
@@ -38,4 +39,4 @@ dirs = "4.0.0"  # For accessing standard directories like home directory
 chrono = "0.4"
 whisper-rs = { version = "0.13.1", features = ["metal"] }
 fon = "0.6.0"
-samplerate = "0.2.4"  # For audio resampling
+samplerate = "0.2.4"

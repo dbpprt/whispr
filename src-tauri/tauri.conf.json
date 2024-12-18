@@ -21,8 +21,10 @@
         "transparent": true,
         "alwaysOnTop": true,
         "skipTaskbar": true,
+        "focus": false,
+        "titleBarStyle": "Transparent",
         "visible": false,
-        "center": true,
+        "center": false,
         "url": "http://localhost:1420"
       }
     ],
