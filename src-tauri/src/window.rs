@@ -1,5 +1,4 @@
-use samplerate::Error;
-use tauri::{Window, Manager, Position};
+use tauri::{Window, Manager};
 use tauri_plugin_positioner::{WindowExt, Position as PositionerPosition};
 
 pub struct OverlayWindow {
