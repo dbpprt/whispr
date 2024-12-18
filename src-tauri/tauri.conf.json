@@ -4,9 +4,9 @@
   "version": "0.1.0",
   "identifier": "com.whispr.app",
   "build": {
-    "beforeDevCommand": "trunk serve",
+    "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "trunk build",
+    "beforeBuildCommand": "npm run build",
     "frontendDist": "../dist"
   },
   "app": {
@@ -25,7 +25,7 @@
         "titleBarStyle": "Transparent",
         "visible": false,
         "center": false,
-        "url": "http://localhost:1420"
+        "url": "index.html"
       }
     ],
     "security": {
