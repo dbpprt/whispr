@@ -1,5 +1,7 @@
-use tauri::{Manager, App};
-use std::sync::Mutex;
+use tauri::{Manager, App, Emitter};
+use std::sync::{Arc, Mutex};
+use std::thread;
+use std::vec::Vec;
 use crate::{
     audio::AudioManager,
     window::OverlayWindow,
@@ -42,13 +44,12 @@ pub fn initialize_app(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
     let audio_manager = Mutex::new(audio_manager);
     app.manage(audio_manager);
     
-    // Load the whisper model once
     let model_path = Path::new("/Users/dbpprt/Downloads/ggml-large-v3-turbo.bin");
     let model_path_str = model_path.to_str().expect("Failed to convert path to string");
-    let ctx = WhisperContext::new_with_params(
+    let ctx = Arc::new(WhisperContext::new_with_params(
         model_path_str,
         WhisperContextParameters::default()
-    ).expect("failed to load model");
+    ).expect("failed to load model"));
 
     let app_handle_clone = app_handle.clone();
     let mut hotkey_manager = HotkeyManager::new(move |is_speaking| {
@@ -69,43 +70,14 @@ pub fn initialize_app(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
                 if let Err(e) = audio.start_capture() {
                     eprintln!("Failed to start audio capture: {}", e);
                 }
+                app_handle_clone.emit("status-change", "Listening").unwrap();
             } else {
                 audio.stop_capture();
-                // Get audio in 16kHz mono format for whisper model
+
+                app_handle_clone.emit("status-change", "Transcribing").unwrap();
+                
                 if let Some(captured_audio) = audio.get_captured_audio(16000, 1) {
-                    // Load current configuration to get latest settings
-                    let config_manager = ConfigManager::<WhisprConfig>::new("settings")
-                        .expect("Failed to create config manager");
-                    let whispr_config = config_manager.load_config("settings")
-                        .expect("Failed to load configuration");
-
-                    // Create params with latest configuration
-                    let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 1 });
-                    params.set_language(whispr_config.whisper.language.as_deref());
-                    params.set_translate(whispr_config.whisper.translate);
-
-                    // Run the model
-                    let mut state = ctx.create_state().expect("failed to create state");
-                    state
-                        .full(params, &captured_audio[..])
-                        .expect("failed to run model");
-
-                    // Fetch the results
-                    let num_segments = state
-                        .full_n_segments()
-                        .expect("failed to get number of segments");
-                    for i in 0..num_segments {
-                        let segment = state
-                            .full_get_segment_text(i)
-                            .expect("failed to get segment");
-                        let start_timestamp = state
-                            .full_get_segment_t0(i)
-                            .expect("failed to get segment start timestamp");
-                        let end_timestamp = state
-                            .full_get_segment_t1(i)
-                            .expect("failed to get segment end timestamp");
-                        println!("[{} - {}]: {}", start_timestamp, end_timestamp, segment);
-                    }
+                    process_audio(captured_audio, app_handle_clone.clone(), Arc::clone(&ctx), whispr_config.clone());
                 }
             }
         }
@@ -129,4 +101,33 @@ pub fn initialize_app(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
     
     app.manage(tray);
     Ok(())
+}
+
+fn process_audio(captured_audio: Vec<f32>, app_handle: tauri::AppHandle, ctx: Arc<WhisperContext>, whispr_config: WhisprConfig) {
+    let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 1 });
+    params.set_language(whispr_config.whisper.language.as_deref());
+    params.set_translate(whispr_config.whisper.translate);
+
+    let mut state = ctx.create_state().expect("failed to create state");
+    state
+        .full(params, &captured_audio[..])
+        .expect("failed to run model");
+
+    let num_segments = state
+        .full_n_segments()
+        .expect("failed to get number of segments");
+    for i in 0..num_segments {
+        let segment = state
+            .full_get_segment_text(i)
+            .expect("failed to get segment");
+        let start_timestamp = state
+            .full_get_segment_t0(i)
+            .expect("failed to get segment start timestamp");
+        let end_timestamp = state
+            .full_get_segment_t1(i)
+            .expect("failed to get segment end timestamp");
+        println!("[{} - {}]: {}", start_timestamp, end_timestamp, segment);
+
+        app_handle.emit("transcription-complete", segment).unwrap();
+    }
 }

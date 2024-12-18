@@ -50,7 +50,7 @@ impl<T> ConfigManager<T> where T: Serialize + for<'de> Deserialize<'de> {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct WhisprConfig {
     pub audio: AudioSettings,
     pub developer: DeveloperSettings,
@@ -67,7 +67,7 @@ impl Default for WhisprConfig {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AudioSettings {
     pub device_name: Option<String>,
     pub remove_silence: bool,
@@ -88,7 +88,7 @@ impl Default for AudioSettings {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct DeveloperSettings {
     pub save_recordings: bool,
 }
@@ -101,7 +101,7 @@ impl Default for DeveloperSettings {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct WhisperSettings {
     pub model_name: String,
     pub language: Option<String>,
