@@ -80,9 +80,9 @@ impl Default for AudioSettings {
     fn default() -> Self {
         Self {
             device_name: None,
-            remove_silence: false,
-            silence_threshold: 0.01,
-            min_silence_duration: 1000,
+            remove_silence: true,
+            silence_threshold: 0.40,
+            min_silence_duration: 250,
             recordings_dir: Some(BASE_PATH.to_string()),
         }
     }

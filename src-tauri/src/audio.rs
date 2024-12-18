@@ -1,5 +1,5 @@
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use cpal::{Device, Host, SampleFormat, Stream};
+use cpal::{Device, Host, SampleFormat, Stream, StreamConfig};
 use hound::{WavWriter, WavSpec};
 use std::sync::{Arc, Mutex};
 use std::fs::File;
@@ -103,12 +103,19 @@ impl AudioManager {
     }
 
     pub fn start_capture(&mut self) -> Result<(), Error> {
-        let config = self.input_device.default_input_config()?;
-        println!("Default input config: {:?}", config);
+        let default_config = self.input_device.default_input_config()?;
+        println!("Default input config: {:?}", default_config);
+
+        let config = StreamConfig {
+            channels: 1,
+            sample_rate: default_config.sample_rate(),
+            buffer_size: cpal::BufferSize::Default,
+        };
+        println!("Using input config: {:?}", config);
 
         let spec = WavSpec {
             channels: 1,
-            sample_rate: config.sample_rate().0,
+            sample_rate: config.sample_rate.0,
             bits_per_sample: 32,
             sample_format: hound::SampleFormat::Float,
         };
@@ -135,13 +142,7 @@ impl AudioManager {
         let silence_config = self.silence_config.clone();
         let start_time = self.start_time.clone();
 
-        let stream = match config.sample_format() {
-            SampleFormat::F32 => self.build_input_stream_f32(&config.into(), is_capturing, wav_writer, silence_config, start_time)?,
-            _ => {
-                let config = self.input_device.default_input_config()?.config().into();
-                self.build_input_stream_f32(&config, is_capturing, wav_writer, silence_config, start_time)?
-            }
-        };
+        let stream = self.build_input_stream_f32(&config, is_capturing, wav_writer, silence_config, start_time)?;
 
         stream.play()?;
         self.stream = Some(stream);
@@ -170,14 +171,14 @@ impl AudioManager {
 
     fn build_input_stream_f32(
         &self,
-        config: &cpal::StreamConfig,
+        config: &StreamConfig,
         is_capturing: Arc<Mutex<bool>>,
         wav_writer: Arc<Mutex<Option<WavWriter<BufWriter<File>>>>>,
         silence_config: Arc<Mutex<SilenceConfig>>,
         start_time: Arc<Mutex<Option<Instant>>>,
     ) -> Result<Stream, Error> {
         let mut silence_counter = 0;
-        let mut buffer = Vec::new();
+        let mut is_in_silence = false;
 
         let input_data_fn = move |data: &[f32], _: &cpal::InputCallbackInfo| {
             if !*is_capturing.lock().unwrap() {
@@ -185,37 +186,32 @@ impl AudioManager {
             }
 
             let config = silence_config.lock().unwrap();
-            if let Some(writer) = &mut *wav_writer.lock().unwrap() {
+            
+            if let Some(ref mut writer) = *wav_writer.lock().unwrap() {
                 if config.enabled {
-                    buffer.clear();
                     for &sample in data {
                         let amplitude = sample.abs();
                         
                         if amplitude > config.threshold {
-                            if silence_counter >= config.min_silence_duration {
+                            if is_in_silence {
+                                is_in_silence = false;
                                 silence_counter = 0;
                             }
-                            buffer.push(sample);
+                            writer.write_sample(sample).unwrap_or_else(|e| eprintln!("Error writing sample: {}", e));
                         } else {
-                            silence_counter += 1;
-                            if silence_counter < config.min_silence_duration {
-                                buffer.push(sample);
+                            if !is_in_silence {
+                                silence_counter += 1;
+                                if silence_counter >= config.min_silence_duration {
+                                    is_in_silence = true;
+                                } else {
+                                    writer.write_sample(sample).unwrap_or_else(|e| eprintln!("Error writing sample: {}", e));
+                                }
                             }
-                        }
-                    }
-
-                    for &sample in &buffer {
-                        if let Err(e) = writer.write_sample(sample) {
-                            eprintln!("Error writing to WAV file: {}", e);
-                            return;
                         }
                     }
                 } else {
                     for &sample in data {
-                        if let Err(e) = writer.write_sample(sample) {
-                            eprintln!("Error writing to WAV file: {}", e);
-                            return;
-                        }
+                        writer.write_sample(sample).unwrap_or_else(|e| eprintln!("Error writing sample: {}", e));
                     }
                 }
             }
