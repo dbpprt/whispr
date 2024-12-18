@@ -1,10 +1,13 @@
-use anyhow::Result;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use cpal::{Device, Host, Sample, SampleFormat, Stream, SizedSample};
+use cpal::{Device, Host, SampleFormat, Stream};
 use hound::{WavWriter, WavSpec};
 use std::sync::{Arc, Mutex};
 use std::fs::File;
 use std::io::BufWriter;
+use crate::config::{ConfigManager, WhisprConfig};
+use chrono::Local;
+use anyhow::Error;
+use std::time::{Instant, Duration};
 
 #[derive(Clone)]
 pub struct SilenceConfig {
@@ -30,18 +33,19 @@ pub struct AudioManager {
     is_capturing: Arc<Mutex<bool>>,
     wav_writer: Arc<Mutex<Option<WavWriter<BufWriter<File>>>>>,
     silence_config: Arc<Mutex<SilenceConfig>>,
+    start_time: Arc<Mutex<Option<Instant>>>,
 }
 
 unsafe impl Send for AudioManager {}
 unsafe impl Sync for AudioManager {}
 
 impl AudioManager {
-    pub fn new() -> Result<Self> {
+    pub fn new() -> Result<Self, Error> {
         let host = cpal::default_host();
         let input_device = host
             .default_input_device()
             .ok_or_else(|| anyhow::anyhow!("No input device available"))?;
-
+        
         println!("Using input device: {}", input_device.name()?);
 
         Ok(Self {
@@ -51,10 +55,11 @@ impl AudioManager {
             is_capturing: Arc::new(Mutex::new(false)),
             wav_writer: Arc::new(Mutex::new(None)),
             silence_config: Arc::new(Mutex::new(SilenceConfig::default())),
+            start_time: Arc::new(Mutex::new(None)),
         })
     }
 
-    pub fn set_input_device(&mut self, device_name: &str) -> Result<()> {
+    pub fn set_input_device(&mut self, device_name: &str) -> Result<(), Error> {
         let devices = self.host.input_devices()?;
         for device in devices {
             if let Ok(name) = device.name() {
@@ -67,7 +72,7 @@ impl AudioManager {
         Err(anyhow::anyhow!("Device not found: {}", device_name))
     }
 
-    pub fn get_current_device_name(&self) -> Result<String> {
+    pub fn get_current_device_name(&self) -> Result<String, Error> {
         Ok(self.input_device.name()?)
     }
 
@@ -86,7 +91,7 @@ impl AudioManager {
         self.silence_config.lock().unwrap().enabled
     }
 
-    pub fn list_input_devices(&self) -> Result<Vec<String>> {
+    pub fn list_input_devices(&self) -> Result<Vec<String>, Error> {
         let devices = self.host.input_devices()?;
         let mut device_names = Vec::new();
         for device in devices {
@@ -97,7 +102,7 @@ impl AudioManager {
         Ok(device_names)
     }
 
-    pub fn start_capture(&mut self) -> Result<()> {
+    pub fn start_capture(&mut self) -> Result<(), Error> {
         let config = self.input_device.default_input_config()?;
         println!("Default input config: {:?}", config);
 
@@ -107,24 +112,42 @@ impl AudioManager {
             bits_per_sample: 32,
             sample_format: hound::SampleFormat::Float,
         };
-        let writer = WavWriter::create("debug.wav", spec)?;
-        *self.wav_writer.lock().unwrap() = Some(writer);
+
+        let config_manager = ConfigManager::<WhisprConfig>::new("settings").expect("Failed to create config manager");
+        let whispr_config = config_manager.load_config("settings").expect("Failed to load configuration");
+
+        let writer = if whispr_config.developer.save_recordings {
+            let timestamp = Local::now().format("%Y-%m-%d_%H-%M-%S").to_string();
+            let recordings_dir = config_manager.get_config_dir().join("recordings");
+            let file_path = recordings_dir.join(format!("{}.wav", timestamp));
+            std::fs::create_dir_all(&recordings_dir).expect("Failed to create recordings directory");
+            println!("Saving recording to: {}", file_path.display());
+            Some(WavWriter::create(file_path, spec)?)
+        } else {
+            None
+        };
+
+        *self.wav_writer.lock().unwrap() = writer;
+        *self.start_time.lock().unwrap() = Some(Instant::now());
 
         let is_capturing = self.is_capturing.clone();
         let wav_writer = self.wav_writer.clone();
         let silence_config = self.silence_config.clone();
+        let start_time = self.start_time.clone();
 
         let stream = match config.sample_format() {
-            SampleFormat::F32 => self.build_input_stream_f32(&config.into(), is_capturing, wav_writer, silence_config)?,
+            SampleFormat::F32 => self.build_input_stream_f32(&config.into(), is_capturing, wav_writer, silence_config, start_time)?,
             _ => {
                 let config = self.input_device.default_input_config()?.config().into();
-                self.build_input_stream_f32(&config, is_capturing, wav_writer, silence_config)?
+                self.build_input_stream_f32(&config, is_capturing, wav_writer, silence_config, start_time)?
             }
         };
 
         stream.play()?;
         self.stream = Some(stream);
         *self.is_capturing.lock().unwrap() = true;
+
+        println!("Capture started");
 
         Ok(())
     }
@@ -138,6 +161,11 @@ impl AudioManager {
                 eprintln!("Error finalizing WAV file: {}", e);
             }
         }
+
+        if let Some(start_time) = self.start_time.lock().unwrap().take() {
+            let duration = start_time.elapsed();
+            println!("Recording stopped after: {:.2}s", duration.as_secs_f32());
+        }
     }
 
     fn build_input_stream_f32(
@@ -146,7 +174,8 @@ impl AudioManager {
         is_capturing: Arc<Mutex<bool>>,
         wav_writer: Arc<Mutex<Option<WavWriter<BufWriter<File>>>>>,
         silence_config: Arc<Mutex<SilenceConfig>>,
-    ) -> Result<Stream> {
+        start_time: Arc<Mutex<Option<Instant>>>,
+    ) -> Result<Stream, Error> {
         let mut silence_counter = 0;
         let mut buffer = Vec::new();
 
@@ -190,8 +219,6 @@ impl AudioManager {
                     }
                 }
             }
-
-            println!("Recorded {} samples", data.len());
         };
 
         let stream = self.input_device.build_input_stream(

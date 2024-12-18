@@ -1,12 +1,11 @@
 use tauri::{
-    AppHandle, Runtime, Manager,
+    AppHandle, Manager, Runtime,
     menu::{Menu, MenuItem, Submenu, CheckMenuItem, PredefinedMenuItem},
-    State,
 };
 use std::sync::Mutex;
 use std::collections::HashMap;
 use crate::audio::AudioManager;
-use crate::config::{ConfigManager, AudioConfig};
+use crate::config::{ConfigManager, WhisprConfig};
 use tauri_plugin_shell::ShellExt;
 
 #[derive(Default)]
@@ -41,15 +40,6 @@ pub fn handle_menu_event<R: Runtime>(app: &AppHandle<R>, id: &str, menu_state: &
             }
         }
         "about" => {
-            // #[cfg(target_os = "windows")]
-            // let _ = app.shell().command("cmd")
-            //     .args(&["/C", "start", "https://github.com/dbpprt/whispr"])
-            //     .spawn();
-            // #[cfg(target_os = "linux")]
-            // let _ = app.shell().command("xdg-open")
-            //     .args(&["https://github.com/dbpprt/whispr"])
-            //     .spawn();
-            // #[cfg(target_os = "macos")]
             let _ = app.shell().command("open")
                 .args(&["https://github.com/dbpprt/whispr"])
                 .spawn();
@@ -64,13 +54,13 @@ pub fn create_tray_menu<R: Runtime>(app: &AppHandle<R>) -> (Menu<R>, HashMap<Str
     let separator = PredefinedMenuItem::separator(app).unwrap();
     let quit = MenuItem::with_id(app, "quit", "Quit".to_string(), true, None::<String>).unwrap();
 
-    let config_manager = ConfigManager::<AudioConfig>::new("audio").expect("Failed to create config manager");
-    let mut audio_config = AudioConfig::default();
+    let config_manager = ConfigManager::<WhisprConfig>::new("settings").expect("Failed to create config manager");
+    let mut whispr_config = WhisprConfig::default();
     
-    if config_manager.config_exists("audio") {
-        match config_manager.load_config("audio") {
-            Ok(config) => audio_config = config,
-            Err(e) => eprintln!("Failed to load audio configuration: {}", e),
+    if config_manager.config_exists("settings") {
+        match config_manager.load_config("settings") {
+            Ok(config) => whispr_config = config,
+            Err(e) => eprintln!("Failed to load configuration: {}", e),
         }
     }
 
@@ -80,7 +70,7 @@ pub fn create_tray_menu<R: Runtime>(app: &AppHandle<R>) -> (Menu<R>, HashMap<Str
     
     if let Ok(devices) = audio_manager.list_input_devices() {
         for device in devices {
-            let is_active = audio_config.device_name.as_ref().map_or(false, |d| d == &device);
+            let is_active = whispr_config.audio.device_name.as_ref().map_or(false, |d| d == &device);
             let item_id = format!("audio_device_{}", device);
             let item = CheckMenuItem::with_id(app, &item_id, &device, true, is_active, None::<String>).unwrap();
             audio_device_items.push(item.clone());
@@ -101,7 +91,7 @@ pub fn create_tray_menu<R: Runtime>(app: &AppHandle<R>) -> (Menu<R>, HashMap<Str
         &audio_device_refs
     ).unwrap();
     
-    let initial_remove_silence_state = audio_config.remove_silence;
+    let initial_remove_silence_state = whispr_config.audio.remove_silence;
     let remove_silence_item = CheckMenuItem::with_id(
         app, 
         "remove_silence", 
@@ -118,7 +108,7 @@ pub fn create_tray_menu<R: Runtime>(app: &AppHandle<R>) -> (Menu<R>, HashMap<Str
         "save_recordings",
         "Save Recordings",
         true,
-        audio_config.developer_options.save_recordings,
+        whispr_config.developer.save_recordings,
         None::<String>
     ).unwrap();
     
@@ -166,11 +156,14 @@ fn handle_audio_device_selection<R: Runtime>(app: AppHandle<R>, id: &str, audio_
                 item.set_checked(device_id == id).unwrap();
             }
 
-            let config_manager = ConfigManager::<AudioConfig>::new("audio").expect("Failed to create config manager");
-            let mut audio_config = AudioConfig::default();
-            audio_config.device_name = Some(id.to_string());
-            if let Err(e) = config_manager.save_config(&audio_config, "audio") {
-                eprintln!("Failed to save audio configuration: {}", e);
+            let config_manager = ConfigManager::<WhisprConfig>::new("settings").expect("Failed to create config manager");
+            let mut whispr_config = WhisprConfig::default();
+            if let Ok(config) = config_manager.load_config("settings") {
+                whispr_config = config;
+            }
+            whispr_config.audio.device_name = Some(id.to_string());
+            if let Err(e) = config_manager.save_config(&whispr_config, "settings") {
+                eprintln!("Failed to save configuration: {}", e);
             }
         }
     }
@@ -187,43 +180,38 @@ fn handle_remove_silence_selection<R: Runtime>(app: AppHandle<R>, remove_silence
         remove_silence_item.set_checked(new_state).unwrap();
         println!("Remove Silence after toggle: {}", new_state);
 
-        let config_manager = ConfigManager::<AudioConfig>::new("audio").expect("Failed to create config manager");
-        let mut audio_config = AudioConfig::default();
-        if let Err(e) = config_manager.load_config("audio") {
-            eprintln!("Failed to load audio configuration: {}", e);
-        } else {
-            match config_manager.load_config("audio") {
-                Ok(config) => audio_config = config,
-                Err(e) => eprintln!("Failed to load audio configuration: {}", e),
-            }
+        let config_manager = ConfigManager::<WhisprConfig>::new("settings").expect("Failed to create config manager");
+        let mut whispr_config = WhisprConfig::default();
+        if let Ok(config) = config_manager.load_config("settings") {
+            whispr_config = config;
         }
-        audio_config.remove_silence = new_state;
-        if let Err(e) = config_manager.save_config(&audio_config, "audio") {
-            eprintln!("Failed to save audio configuration: {}", e);
+        whispr_config.audio.remove_silence = new_state;
+        if let Err(e) = config_manager.save_config(&whispr_config, "settings") {
+            eprintln!("Failed to save configuration: {}", e);
         }
     }
 }
 
-fn handle_save_recordings_selection<R: Runtime>(_app: AppHandle<R>, save_recordings_item: &CheckMenuItem<R>) {
-    let config_manager = ConfigManager::<AudioConfig>::new("audio").expect("Failed to create config manager");
-    let mut audio_config = AudioConfig::default();
+fn handle_save_recordings_selection<R: Runtime>(app: AppHandle<R>, save_recordings_item: &CheckMenuItem<R>) {
+    let config_manager = ConfigManager::<WhisprConfig>::new("settings").expect("Failed to create config manager");
+    let mut whispr_config = WhisprConfig::default();
     
-    if config_manager.config_exists("audio") {
-        match config_manager.load_config("audio") {
-            Ok(config) => audio_config = config,
-            Err(e) => eprintln!("Failed to load audio configuration: {}", e),
+    if config_manager.config_exists("settings") {
+        match config_manager.load_config("settings") {
+            Ok(config) => whispr_config = config,
+            Err(e) => eprintln!("Failed to load configuration: {}", e),
         }
     }
 
-    let current_state = audio_config.developer_options.save_recordings;
+    let current_state = whispr_config.developer.save_recordings;
     let new_state = !current_state;
 
     println!("Save Recordings before toggle: {}", current_state);
     save_recordings_item.set_checked(new_state).unwrap();
     println!("Save Recordings after toggle: {}", new_state);
 
-    audio_config.developer_options.save_recordings = new_state;
-    if let Err(e) = config_manager.save_config(&audio_config, "audio") {
-        eprintln!("Failed to save audio configuration: {}", e);
+    whispr_config.developer.save_recordings = new_state;
+    if let Err(e) = config_manager.save_config(&whispr_config, "settings") {
+        eprintln!("Failed to save configuration: {}", e);
     }
 }

@@ -13,3 +13,5 @@ A macOS menubar application for seamless voice-to-text transcription using local
 ## Development
 
 See [TODO.md](TODO.md) for the detailed development roadmap and progress.
+
+-- TODO: Add story about rig.

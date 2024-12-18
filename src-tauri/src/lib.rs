@@ -1,5 +1,3 @@
-use tauri::Runtime;
-
 mod hotkey;
 mod window;
 mod audio;

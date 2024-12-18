@@ -1,10 +1,10 @@
-use tauri::{AppHandle, Runtime, Manager, App};
+use tauri::{Manager, App};
 use std::sync::Mutex;
 use crate::{
     audio::AudioManager,
     window::OverlayWindow,
     hotkey::HotkeyManager,
-    config::{ConfigManager, AudioConfig},
+    config::{ConfigManager, WhisprConfig},
     menu::{create_tray_menu, MenuState},
 };
 
@@ -19,23 +19,23 @@ pub fn initialize_app(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
     let overlay_window = Mutex::new(overlay_window);
     app.manage(overlay_window);
     
-    let config_manager = ConfigManager::<AudioConfig>::new("audio").expect("Failed to create config manager");
-    let mut audio_config = AudioConfig::default();
+    let config_manager = ConfigManager::<WhisprConfig>::new("settings").expect("Failed to create config manager");
+    let mut whispr_config = WhisprConfig::default();
     
-    if config_manager.config_exists("audio") {
-        match config_manager.load_config("audio") {
-            Ok(config) => audio_config = config,
-            Err(e) => eprintln!("Failed to load audio configuration: {}", e),
+    if config_manager.config_exists("settings") {
+        match config_manager.load_config("settings") {
+            Ok(config) => whispr_config = config,
+            Err(e) => eprintln!("Failed to load configuration: {}", e),
         }
     }
 
     let mut audio_manager = AudioManager::new().expect("Failed to initialize audio manager");
-    if let Some(device_name) = &audio_config.device_name {
+    if let Some(device_name) = &whispr_config.audio.device_name {
         if let Err(e) = audio_manager.set_input_device(device_name) {
             eprintln!("Failed to set input device from configuration: {}", e);
         }
     }
-    audio_manager.set_remove_silence(audio_config.remove_silence);
+    audio_manager.set_remove_silence(whispr_config.audio.remove_silence);
 
     let audio_manager = Mutex::new(audio_manager);
     app.manage(audio_manager);
