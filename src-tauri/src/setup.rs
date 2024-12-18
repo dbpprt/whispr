@@ -95,7 +95,7 @@ pub fn initialize_app(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
         .on_menu_event(move |app, event| {
             println!("Menu item clicked: {:?}", event.id());
             let menu_state = handle_clone.state::<MenuState<_>>();
-            crate::menu::handle_menu_event(app, &event.id().0, &menu_state);
+            crate::menu::handle_menu_event(app.clone(), &event.id().0, &menu_state);
         })
         .build(app_handle)?;
     
