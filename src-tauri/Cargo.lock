@@ -4680,6 +4680,7 @@ dependencies = [
  "tauri-plugin-positioner",
  "tauri-plugin-shell",
  "tempfile",
+ "thiserror 1.0.69",
  "tokio",
  "toml 0.8.19",
  "whisper-rs",

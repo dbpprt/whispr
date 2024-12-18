@@ -5,10 +5,6 @@ description = "A Tauri App"
 authors = ["you"]
 edition = "2021"
 
-[lib]
-name = "whispr_lib"
-crate-type = ["staticlib", "cdylib", "rlib"]
-
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
@@ -22,6 +18,7 @@ serde_json = "1"
 tokio = { version = "1", features = ["full"] }
 objc = "0.2"
 anyhow = "1.0"
+thiserror = "1.0"
 cpal = "0.15"  # For audio capture
 ringbuf = "0.4.7"  # For audio buffer management
 toml = "0.8.19"

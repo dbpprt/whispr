@@ -1,6 +1,205 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod hotkey;
+mod window;
+mod audio;
+mod config;
+mod menu;
+
+use tauri::{Manager, App, AppHandle, Runtime, Wry, Emitter};
+use std::sync::{Arc, Mutex};
+use std::path::Path;
+use whisper_rs::{WhisperContext, WhisperContextParameters, FullParams, SamplingStrategy};
+
+use crate::{
+    audio::AudioManager,
+    window::OverlayWindow,
+    hotkey::HotkeyManager,
+    config::{ConfigManager, WhisprConfig},
+    menu::{create_tray_menu, MenuState},
+};
+
+#[derive(thiserror::Error, Debug)]
+pub enum WhisprError {
+    #[error("Audio initialization failed: {0}")]
+    AudioError(String),
+    #[error("Configuration error: {0}")]
+    ConfigError(String),
+    #[error("Hotkey error: {0}")]
+    HotkeyError(String),
+    #[error("Whisper model error: {0}")]
+    WhisperError(String),
+    #[error("System error: {0}")]
+    SystemError(String),
+}
+
+type Result<T> = std::result::Result<T, WhisprError>;
+
+struct WhisperProcessor {
+    ctx: Arc<WhisperContext>,
+    config: WhisprConfig,
+}
+
+impl WhisperProcessor {
+    fn new(model_path: &Path, config: WhisprConfig) -> Result<Self> {
+        let ctx = WhisperContext::new_with_params(
+            model_path.to_str().ok_or_else(|| WhisprError::SystemError("Invalid model path".into()))?,
+            WhisperContextParameters::default()
+        ).map_err(|e| WhisprError::WhisperError(e.to_string()))?;
+
+        Ok(Self {
+            ctx: Arc::new(ctx),
+            config,
+        })
+    }
+
+    fn process_audio<R: Runtime>(&self, captured_audio: Vec<f32>, app_handle: &AppHandle<R>) -> Result<()> {
+        let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 1 });
+        params.set_language(self.config.whisper.language.as_deref());
+        params.set_translate(self.config.whisper.translate);
+
+        let mut state = self.ctx.create_state()
+            .map_err(|e| WhisprError::WhisperError(e.to_string()))?;
+
+        state.full(params, &captured_audio[..])
+            .map_err(|e| WhisprError::WhisperError(e.to_string()))?;
+
+        let num_segments = state.full_n_segments()
+            .map_err(|e| WhisprError::WhisperError(e.to_string()))?;
+
+        for i in 0..num_segments {
+            let segment = state.full_get_segment_text(i)
+                .map_err(|e| WhisprError::WhisperError(e.to_string()))?;
+            let start = state.full_get_segment_t0(i)
+                .map_err(|e| WhisprError::WhisperError(e.to_string()))?;
+            let end = state.full_get_segment_t1(i)
+                .map_err(|e| WhisprError::WhisperError(e.to_string()))?;
+
+            println!("[{} - {}]: {}", start, end, segment);
+            app_handle.emit("transcription-complete", segment)
+                .map_err(|e| WhisprError::SystemError(e.to_string()))?;
+        }
+        Ok(())
+    }
+}
+
+struct AppState {
+    whisper: WhisperProcessor,
+    audio: Mutex<AudioManager>,
+    overlay: Mutex<OverlayWindow>,
+}
+
+impl AppState {
+    fn new(config: WhisprConfig) -> Result<Self> {
+        let audio_manager = AudioManager::new()
+            .map_err(|e| WhisprError::AudioError(e.to_string()))?;
+        
+        let model_path = Path::new("/Users/dbpprt/Downloads/ggml-large-v3-turbo.bin");
+        let whisper = WhisperProcessor::new(model_path, config)?;
+
+        Ok(Self {
+            whisper,
+            audio: Mutex::new(audio_manager),
+            overlay: Mutex::new(OverlayWindow::new()),
+        })
+    }
+
+    fn configure_audio(&self, config: &WhisprConfig) -> Result<()> {
+        let mut audio = self.audio.lock().unwrap();
+        if let Some(device_name) = &config.audio.device_name {
+            audio.set_input_device(device_name)
+                .map_err(|e| WhisprError::AudioError(e.to_string()))?;
+        }
+        audio.set_remove_silence(config.audio.remove_silence);
+        Ok(())
+    }
+}
+
+fn setup_app(app: &mut App<Wry>) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    let app_handle = app.handle();
+    
+    // Initialize configuration
+    let config_manager = ConfigManager::<WhisprConfig>::new("settings")
+        .map_err(|e| WhisprError::ConfigError(e.to_string()))?;
+    
+    let whispr_config = if config_manager.config_exists("settings") {
+        config_manager.load_config("settings")
+            .map_err(|e| WhisprError::ConfigError(e.to_string()))?
+    } else {
+        WhisprConfig::default()
+    };
+
+    // Initialize application state
+    let state = AppState::new(whispr_config.clone())?;
+    state.configure_audio(&whispr_config)?;
+    
+    // Create window
+    state.overlay.lock().unwrap().create_window(&app_handle);
+    
+    // Store state
+    app.manage(state);
+
+    // Setup tray and menu
+    let (tray_menu, _, menu_state) = create_tray_menu(&app_handle);
+    app.manage(menu_state);
+
+    let handle_clone = app_handle.clone();
+    let tray = tauri::tray::TrayIconBuilder::new()
+        .icon(app_handle.default_window_icon().unwrap().clone())
+        .menu(&tray_menu)
+        .on_menu_event(move |app, event| {
+            let menu_state = handle_clone.state::<MenuState<_>>();
+            crate::menu::handle_menu_event(app.clone(), &event.id().0, &menu_state);
+        })
+        .build(app_handle)
+        .map_err(|e| Box::new(WhisprError::SystemError(e.to_string())) as Box<dyn std::error::Error>)?;
+    
+    app.manage(tray);
+
+    // Setup hotkey manager
+    let app_handle_clone = app_handle.clone();
+    let mut hotkey_manager = HotkeyManager::new(move |is_speaking| {
+        if let Some(state) = app_handle_clone.try_state::<AppState>() {
+            let overlay = state.overlay.lock().unwrap();
+            if is_speaking {
+                overlay.show();
+            } else {
+                overlay.hide();
+            }
+
+            let mut audio = state.audio.lock().unwrap();
+            if is_speaking {
+                if let Err(e) = audio.start_capture() {
+                    eprintln!("Failed to start audio capture: {}", e);
+                    return;
+                }
+                let _ = app_handle_clone.emit("status-change", "Listening");
+            } else {
+                audio.stop_capture();
+                let _ = app_handle_clone.emit("status-change", "Transcribing");
+                
+                if let Some(captured_audio) = audio.get_captured_audio(16000, 1) {
+                    if let Err(e) = state.whisper.process_audio(captured_audio, &app_handle_clone) {
+                        eprintln!("Failed to process audio: {}", e);
+                    }
+                }
+            }
+        }
+    });
+
+    hotkey_manager.start()
+        .map_err(|e| Box::new(WhisprError::HotkeyError(e.to_string())) as Box<dyn std::error::Error>)?;
+
+    Ok(())
+}
+
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
 fn main() {
-    whispr_lib::run()
+    tauri::Builder::default()
+        .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_positioner::init())
+        .setup(setup_app)
+        .run(tauri::generate_context!())
+        .expect("error while running tauri application");
 }

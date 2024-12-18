@@ -2,5 +2,9 @@
   "emmet.includeLanguages": {
     "rust": "html"
   },
-  "rust-analyzer.cargo.workspaceRoot": "${workspaceFolder}/src-tauri"
+  "rust-analyzer.cargo.workspaceRoot": "${workspaceFolder}/src-tauri",
+  "cSpell.words": [
+    "thiserror",
+    "Whispr"
+  ]
 }
