@@ -76,10 +76,21 @@ fn merge_json_values(stored: Value, default: Value) -> (Value, bool) {
             let mut had_missing_fields = false;
             
             for (key, default_value) in default_map {
-                if !stored_map.contains_key(&key) {
-                    println!("Missing config field: {}", key);
-                    had_missing_fields = true;
-                    stored_map.insert(key, default_value);
+                match stored_map.get(&key) {
+                    None => {
+                        println!("Missing config field: {}", key);
+                        had_missing_fields = true;
+                        stored_map.insert(key, default_value);
+                    }
+                    Some(stored_value) => {
+                        if let Value::Object(_) = default_value {
+                            let (merged, missing) = merge_json_values(stored_value.clone(), default_value);
+                            if missing {
+                                had_missing_fields = true;
+                                stored_map.insert(key, merged);
+                            }
+                        }
+                    }
                 }
             }
             
@@ -132,12 +143,14 @@ impl Default for AudioSettings {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct DeveloperSettings {
     pub save_recordings: bool,
+    pub whisper_logging: bool, // New field for Whisper logging
 }
 
 impl Default for DeveloperSettings {
     fn default() -> Self {
         Self {
             save_recordings: false,
+            whisper_logging: false, // Default value for Whisper logging
         }
     }
 }

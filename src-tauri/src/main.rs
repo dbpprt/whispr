@@ -139,9 +139,10 @@ fn setup_app(app: &mut App<Wry>) -> std::result::Result<(), Box<dyn std::error::
                         println!("{}", transcription);
 
                         let mut enigo = Enigo::new(&Settings::default()).unwrap();
-                        enigo
-                            .text(&transcription)
-                            .unwrap();
+                        if let Err(e) = enigo.text(&transcription) {
+                            eprintln!("Failed to send text: {}", e);
+                            return;
+                        }
                     } else {
                         eprintln!("Failed to process audio");
                     }

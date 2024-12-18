@@ -17,6 +17,7 @@ pub struct MenuState<R: Runtime> {
     pub language_items: Mutex<HashMap<String, CheckMenuItem<R>>>,
     pub translate_item: Option<CheckMenuItem<R>>,
     pub start_at_login_item: Option<CheckMenuItem<R>>,
+    pub whisper_logging_item: Option<CheckMenuItem<R>>, // New field for Whisper logging
 }
 
 pub fn handle_menu_event<R: Runtime>(app: AppHandle<R>, id: &str, menu_state: &MenuState<R>) {
@@ -73,6 +74,11 @@ pub fn handle_menu_event<R: Runtime>(app: AppHandle<R>, id: &str, menu_state: &M
         "start_at_login" => {
             if let Some(start_at_login_item) = &menu_state.start_at_login_item {
                 handle_start_at_login_selection(&app, start_at_login_item);
+            }
+        }
+        "whisper_logging" => { // New event handler for Whisper logging
+            if let Some(whisper_logging_item) = &menu_state.whisper_logging_item {
+                handle_whisper_logging_selection(&app, whisper_logging_item);
             }
         }
         _ => {
@@ -143,11 +149,20 @@ pub fn create_tray_menu<R: Runtime>(app: &AppHandle<R>) -> (Menu<R>, HashMap<Str
         None::<String>
     ).unwrap();
     
+    let whisper_logging_item = CheckMenuItem::with_id( // New item for Whisper logging
+        app,
+        "whisper_logging",
+        "Whisper Logging",
+        true,
+        whispr_config.developer.whisper_logging,
+        None::<String>
+    ).unwrap();
+
     let developer_options_submenu = Submenu::with_items(
         app,
         "Developer Options",
         true,
-        &[&save_recordings_item as &dyn tauri::menu::IsMenuItem<R>]
+        &[&save_recordings_item as &dyn tauri::menu::IsMenuItem<R>, &whisper_logging_item as &dyn tauri::menu::IsMenuItem<R>] // Include Whisper logging item
     ).unwrap();
 
     let language_items = vec![
@@ -217,6 +232,7 @@ pub fn create_tray_menu<R: Runtime>(app: &AppHandle<R>) -> (Menu<R>, HashMap<Str
         language_items: Mutex::new(language_check_items),
         translate_item: Some(translate_item),
         start_at_login_item: Some(start_at_login_item),
+        whisper_logging_item: Some(whisper_logging_item), // Include Whisper logging item in state
     };
     
     (menu, audio_device_map.clone(), menu_state)
@@ -292,6 +308,30 @@ fn handle_save_recordings_selection<R: Runtime>(app: &AppHandle<R>, save_recordi
     println!("Save Recordings after toggle: {}", new_state);
 
     whispr_config.developer.save_recordings = new_state;
+    if let Err(e) = config_manager.save_config(&whispr_config, "settings") {
+        eprintln!("Failed to save configuration: {}", e);
+    }
+}
+
+fn handle_whisper_logging_selection<R: Runtime>(app: &AppHandle<R>, whisper_logging_item: &CheckMenuItem<R>) { // New function for Whisper logging
+    let config_manager = ConfigManager::<WhisprConfig>::new("settings").expect("Failed to create config manager");
+    let mut whispr_config = WhisprConfig::default();
+    
+    if config_manager.config_exists("settings") {
+        match config_manager.load_config("settings") {
+            Ok(config) => whispr_config = config,
+            Err(e) => eprintln!("Failed to load configuration: {}", e),
+        }
+    }
+
+    let current_state = whispr_config.developer.whisper_logging;
+    let new_state = !current_state;
+
+    println!("Whisper Logging before toggle: {}", current_state);
+    whisper_logging_item.set_checked(new_state).unwrap();
+    println!("Whisper Logging after toggle: {}", new_state);
+
+    whispr_config.developer.whisper_logging = new_state;
     if let Err(e) = config_manager.save_config(&whispr_config, "settings") {
         eprintln!("Failed to save configuration: {}", e);
     }
