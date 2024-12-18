@@ -13,7 +13,7 @@ pub struct MenuState<R: Runtime> {
     pub audio_device_map: Mutex<HashMap<String, CheckMenuItem<R>>>,
     pub remove_silence_item: Option<CheckMenuItem<R>>,
     pub save_recordings_item: Option<CheckMenuItem<R>>,
-    pub language_items: HashMap<String, CheckMenuItem<R>>, // New field for language items
+    pub language_items: Mutex<HashMap<String, CheckMenuItem<R>>>,
 }
 
 pub fn handle_menu_event<R: Runtime>(app: &AppHandle<R>, id: &str, menu_state: &MenuState<R>) {
@@ -45,9 +45,20 @@ pub fn handle_menu_event<R: Runtime>(app: &AppHandle<R>, id: &str, menu_state: &
                 .args(&["https://github.com/dbpprt/whispr"])
                 .spawn();
         }
-        id if id.starts_with("language_") => { // New handler for language items
-            if let Some(item) = menu_state.language_items.get(id) {
-                let language = id.strip_prefix("language_").unwrap();
+        id if id.starts_with("language_") => {
+            let language_items = menu_state.language_items.lock().unwrap(); // Lock Mutex
+            if let Some(item) = language_items.get(id) {
+                let language = match id.strip_prefix("language_").unwrap() {
+                    "Automatic" => "auto",
+                    "English" => "en",
+                    "German" => "de",
+                    "French" => "fr",
+                    "Spanish" => "es",
+                    _ => {
+                        eprintln!("Error: Unknown language selected: {}", id);
+                        return;
+                    }
+                };
                 handle_language_selection(app.clone(), item.clone(), language);
             }
         }
@@ -127,11 +138,11 @@ pub fn create_tray_menu<R: Runtime>(app: &AppHandle<R>) -> (Menu<R>, HashMap<Str
     ).unwrap();
 
     let language_items = vec![
-        ("Automatic", whispr_config.whisper.language.as_ref().map_or(false, |l| l == "Automatic")),
-        ("English", whispr_config.whisper.language.as_ref().map_or(false, |l| l == "English")),
-        ("German", whispr_config.whisper.language.as_ref().map_or(false, |l| l == "German")),
-        ("French", whispr_config.whisper.language.as_ref().map_or(false, |l| l == "French")),
-        ("Spanish", whispr_config.whisper.language.as_ref().map_or(false, |l| l == "Spanish")),
+        ("Automatic", whispr_config.whisper.language.as_ref().map_or(true, |l| l == "auto")), // Default to "auto"
+        ("English", whispr_config.whisper.language.as_ref().map_or(false, |l| l == "en")),
+        ("German", whispr_config.whisper.language.as_ref().map_or(false, |l| l == "de")),
+        ("French", whispr_config.whisper.language.as_ref().map_or(false, |l| l == "fr")),
+        ("Spanish", whispr_config.whisper.language.as_ref().map_or(false, |l| l == "es")),
     ];
 
     let mut language_check_items = HashMap::new();
@@ -169,7 +180,7 @@ pub fn create_tray_menu<R: Runtime>(app: &AppHandle<R>) -> (Menu<R>, HashMap<Str
         audio_device_map: Mutex::new(audio_device_map.clone()),
         remove_silence_item: Some(remove_silence_item),
         save_recordings_item: Some(save_recordings_item),
-        language_items: language_check_items, // Store language items in menu state
+        language_items: Mutex::new(language_check_items), // Wrap in Mutex
     };
     
     (menu, audio_device_map.clone(), menu_state)
@@ -268,7 +279,8 @@ fn handle_language_selection<R: Runtime>(app: AppHandle<R>, item: CheckMenuItem<
 
     // Uncheck all language items
     let menu_state = app.state::<MenuState<R>>();
-    for (item_id, menu_item) in &menu_state.language_items {
+    let mut language_items = menu_state.language_items.lock().unwrap(); // Lock Mutex
+    for (item_id, menu_item) in &mut *language_items {
         menu_item.set_checked(item_id.strip_prefix("language_").unwrap() == language).unwrap();
     }
 }
