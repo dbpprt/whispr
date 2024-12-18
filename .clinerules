@@ -1,3 +1,4 @@
 Rules:
 - Do not write code in the chat (e.g. "Here's the corrected version ..."), only using tools.
 - Important: we use tauri v2 not v1, there are many breaking changes!
+- Do not write doc strings or unnecessary comments. Only comment really complex parts of the code.

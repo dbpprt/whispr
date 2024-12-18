@@ -17,6 +17,7 @@ pub struct MenuState<R: Runtime> {
     pub save_recordings_item: Option<CheckMenuItem<R>>,
     pub language_items: Mutex<MenuItemMap<R>>,
     pub translate_item: Option<CheckMenuItem<R>>,
+    pub start_at_login_item: Option<CheckMenuItem<R>>, // New field for Start at Login
 }
 
 impl<R: Runtime> MenuState<R> {
@@ -97,6 +98,11 @@ pub fn handle_menu_event<R: Runtime>(app: AppHandle<R>, id: &str, menu_state: &M
                 .map(|item| handle_translate_selection(item))
                 .unwrap_or_else(|| Ok(()))
         }
+        "start_at_login" => { // New handler for Start at Login
+            menu_state.start_at_login_item.as_ref()
+                .map(|item| handle_start_at_login_selection(item))
+                .unwrap_or_else(|| Ok(()))
+        }
         _ => Ok(()),
     };
 
@@ -115,6 +121,7 @@ pub fn create_tray_menu<R: Runtime>(app: &AppHandle<R>) -> (Menu<R>, MenuItemMap
     let save_recordings_item = create_check_item(app, "save_recordings", "Save Recordings", config.developer.save_recordings);
     let (language_submenu, language_items) = create_language_submenu(app, &config);
     let translate_item = create_check_item(app, "translate", "Translate to English", config.whisper.translate);
+    let start_at_login_item = create_check_item(app, "start_at_login", "Start at Login", config.start_at_login); // New item for Start at Login
 
     let developer_submenu = Submenu::with_items(
         app,
@@ -125,6 +132,8 @@ pub fn create_tray_menu<R: Runtime>(app: &AppHandle<R>) -> (Menu<R>, MenuItemMap
 
     let menu = Menu::with_items(app, &[
         &MenuItem::with_id(app, "quit", "Quit", true, None::<String>).unwrap(),
+        &PredefinedMenuItem::separator(app).unwrap(),
+        &start_at_login_item, // Added Start at Login item
         &PredefinedMenuItem::separator(app).unwrap(),
         &audio_submenu,
         &language_submenu,
@@ -141,6 +150,7 @@ pub fn create_tray_menu<R: Runtime>(app: &AppHandle<R>) -> (Menu<R>, MenuItemMap
         save_recordings_item: Some(save_recordings_item),
         language_items: Mutex::new(language_items),
         translate_item: Some(translate_item),
+        start_at_login_item: Some(start_at_login_item), // Added Start at Login item to menu state
     };
 
     (menu, audio_device_map, menu_state)
@@ -294,6 +304,14 @@ fn handle_translate_selection<R: Runtime>(
     MenuState::<R>::toggle_check_item(item, |new_state| {
         MenuState::<R>::update_config(|config| {
             config.whisper.translate = new_state;
+        })
+    })
+}
+
+fn handle_start_at_login_selection<R: Runtime>(item: &CheckMenuItem<R>) -> Result<(), String> { // New handler for Start at Login
+    MenuState::<R>::toggle_check_item(item, |new_state| {
+        MenuState::<R>::update_config(|config| {
+            config.start_at_login = new_state;
         })
     })
 }

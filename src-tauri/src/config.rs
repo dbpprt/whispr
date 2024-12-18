@@ -3,16 +3,17 @@ use serde::{Serialize, Deserialize};
 use std::path::{Path, PathBuf};
 use std::fs;
 use std::marker::PhantomData;
+use serde_json::Value;
 
 const BASE_PATH: &str = ".whispr";
 const SETTINGS_FILE: &str = "settings";
 
-pub struct ConfigManager<T> where T: Serialize + for<'de> Deserialize<'de> {
+pub struct ConfigManager<T> where T: Serialize + for<'de> Deserialize<'de> + Default {
     config_dir: PathBuf,
     _phantom: PhantomData<T>,
 }
 
-impl<T> ConfigManager<T> where T: Serialize + for<'de> Deserialize<'de> {
+impl<T> ConfigManager<T> where T: Serialize + for<'de> Deserialize<'de> + Default {
     pub fn new(_config_name: &str) -> Result<Self> {
         let home_dir = dirs::home_dir().ok_or_else(|| anyhow::anyhow!("Could not find home directory"))?;
         let config_dir = home_dir.join(BASE_PATH);
@@ -36,8 +37,27 @@ impl<T> ConfigManager<T> where T: Serialize + for<'de> Deserialize<'de> {
 
     pub fn load_config(&self, _name: &str) -> Result<T> {
         let config_path = self.config_dir.join(format!("{}.json", SETTINGS_FILE));
-        let config_str = fs::read_to_string(config_path)?;
-        let config: T = serde_json::from_str(&config_str)?;
+        
+        if !config_path.exists() {
+            let default_config = T::default();
+            self.save_config(&default_config, _name)?;
+            return Ok(default_config);
+        }
+
+        let config_str = fs::read_to_string(&config_path)?;
+        let stored_config: Value = serde_json::from_str(&config_str)?;
+        let default_config = T::default();
+        let default_value = serde_json::to_value(&default_config)?;
+
+        let (merged_value, had_missing_fields) = merge_json_values(stored_config, default_value);
+        
+        if had_missing_fields {
+            println!("Config file had missing fields, updating with default values");
+            let config: T = serde_json::from_value(merged_value.clone())?;
+            self.save_config(&config, _name)?;
+        }
+        
+        let config: T = serde_json::from_value(merged_value)?;
         Ok(config)
     }
 
@@ -50,11 +70,31 @@ impl<T> ConfigManager<T> where T: Serialize + for<'de> Deserialize<'de> {
     }
 }
 
+fn merge_json_values(stored: Value, default: Value) -> (Value, bool) {
+    match (stored, default) {
+        (Value::Object(mut stored_map), Value::Object(default_map)) => {
+            let mut had_missing_fields = false;
+            
+            for (key, default_value) in default_map {
+                if !stored_map.contains_key(&key) {
+                    println!("Missing config field: {}", key);
+                    had_missing_fields = true;
+                    stored_map.insert(key, default_value);
+                }
+            }
+            
+            (Value::Object(stored_map), had_missing_fields)
+        }
+        (stored, _) => (stored, false),
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct WhisprConfig {
     pub audio: AudioSettings,
     pub developer: DeveloperSettings,
     pub whisper: WhisperSettings,
+    pub start_at_login: bool,
 }
 
 impl Default for WhisprConfig {
@@ -63,6 +103,7 @@ impl Default for WhisprConfig {
             audio: AudioSettings::default(),
             developer: DeveloperSettings::default(),
             whisper: WhisperSettings::default(),
+            start_at_login: false,
         }
     }
 }
