@@ -51,7 +51,7 @@ impl AppState {
         let model_path = Path::new("/Users/dbpprt/Downloads/ggml-large-v3-turbo.bin");
         let whisper = WhisperProcessor::new(model_path, config)
             .map_err(|e| WhisprError::WhisperError(e))?;
-
+ 
         Ok(Self {
             whisper,
             audio: Mutex::new(audio_manager),
@@ -154,6 +154,7 @@ fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_positioner::init())
+        .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, None))
         .setup(setup_app)
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

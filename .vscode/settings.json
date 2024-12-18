@@ -4,6 +4,7 @@
   },
   "rust-analyzer.cargo.workspaceRoot": "${workspaceFolder}/src-tauri",
   "cSpell.words": [
+    "autolaunch",
     "thiserror",
     "Whispr"
   ]
