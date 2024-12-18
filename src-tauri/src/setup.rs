@@ -50,9 +50,6 @@ pub fn initialize_app(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
         WhisperContextParameters::default()
     ).expect("failed to load model");
 
-    // Create a params object
-    let params = FullParams::new(SamplingStrategy::Greedy { best_of: 1 });
-
     let app_handle_clone = app_handle.clone();
     let mut hotkey_manager = HotkeyManager::new(move |is_speaking| {
         println!("Speaking state changed: {}", is_speaking);
@@ -76,10 +73,21 @@ pub fn initialize_app(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
                 audio.stop_capture();
                 // Get audio in 16kHz mono format for whisper model
                 if let Some(captured_audio) = audio.get_captured_audio(16000, 1) {
+                    // Load current configuration to get latest settings
+                    let config_manager = ConfigManager::<WhisprConfig>::new("settings")
+                        .expect("Failed to create config manager");
+                    let whispr_config = config_manager.load_config("settings")
+                        .expect("Failed to load configuration");
+
+                    // Create params with latest configuration
+                    let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 1 });
+                    params.set_language(whispr_config.whisper.language.as_deref());
+                    params.set_translate(whispr_config.whisper.translate);
+
                     // Run the model
                     let mut state = ctx.create_state().expect("failed to create state");
                     state
-                        .full(params.clone(), &captured_audio[..])
+                        .full(params, &captured_audio[..])
                         .expect("failed to run model");
 
                     // Fetch the results

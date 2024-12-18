@@ -22,12 +22,6 @@ fn audio_resample(data: &[f32], sample_rate0: u32, sample_rate: u32, channels: u
 }
 
 fn stereo_to_mono(stereo_data: &[f32]) -> Vec<f32> {
-    assert_eq!(
-        stereo_data.len() % 2,
-        0,
-        "Stereo data length should be even."
-    );
-
     let mut mono_data = Vec::with_capacity(stereo_data.len() / 2);
     for chunk in stereo_data.chunks_exact(2) {
         let average = (chunk[0] + chunk[1]) / 2.0;
@@ -277,10 +271,20 @@ impl AudioManager {
 
             let mut processed_audio = audio_data;
 
-            // Convert stereo to mono if needed
-            if captured_channels > desired_channels {
+            // Only convert stereo to mono if we have stereo input and want mono output
+            if captured_channels == 2 && desired_channels == 1 {
                 processed_audio = stereo_to_mono(&processed_audio);
+            } else if captured_channels > 2 {
+                // Handle other multi-channel formats (if any) by averaging all channels
+                let samples_per_frame = captured_channels as usize;
+                let mut mono_data = Vec::with_capacity(processed_audio.len() / samples_per_frame);
+                for chunk in processed_audio.chunks_exact(samples_per_frame) {
+                    let average = chunk.iter().sum::<f32>() / samples_per_frame as f32;
+                    mono_data.push(average);
+                }
+                processed_audio = mono_data;
             }
+            // Note: If input is already mono, no channel conversion needed
 
             // Resample if needed
             if captured_sample_rate != desired_sample_rate {
