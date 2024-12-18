@@ -13,6 +13,7 @@ pub struct MenuState<R: Runtime> {
     pub audio_device_map: Mutex<HashMap<String, CheckMenuItem<R>>>,
     pub remove_silence_item: Option<CheckMenuItem<R>>,
     pub save_recordings_item: Option<CheckMenuItem<R>>,
+    pub language_items: HashMap<String, CheckMenuItem<R>>, // New field for language items
 }
 
 pub fn handle_menu_event<R: Runtime>(app: &AppHandle<R>, id: &str, menu_state: &MenuState<R>) {
@@ -43,6 +44,12 @@ pub fn handle_menu_event<R: Runtime>(app: &AppHandle<R>, id: &str, menu_state: &
             let _ = app.shell().command("open")
                 .args(&["https://github.com/dbpprt/whispr"])
                 .spawn();
+        }
+        id if id.starts_with("language_") => { // New handler for language items
+            if let Some(item) = menu_state.language_items.get(id) {
+                let language = id.strip_prefix("language_").unwrap();
+                handle_language_selection(app.clone(), item.clone(), language);
+            }
         }
         _ => {
             eprintln!("Warning: Unhandled menu item: {:?}", id);
@@ -118,13 +125,39 @@ pub fn create_tray_menu<R: Runtime>(app: &AppHandle<R>) -> (Menu<R>, HashMap<Str
         true,
         &[&save_recordings_item as &dyn tauri::menu::IsMenuItem<R>]
     ).unwrap();
-    
+
+    let language_items = vec![
+        ("Automatic", whispr_config.whisper.language.as_ref().map_or(false, |l| l == "Automatic")),
+        ("English", whispr_config.whisper.language.as_ref().map_or(false, |l| l == "English")),
+        ("German", whispr_config.whisper.language.as_ref().map_or(false, |l| l == "German")),
+        ("French", whispr_config.whisper.language.as_ref().map_or(false, |l| l == "French")),
+        ("Spanish", whispr_config.whisper.language.as_ref().map_or(false, |l| l == "Spanish")),
+    ];
+
+    let mut language_check_items = HashMap::new();
+    let mut language_menu_items: Vec<&'static dyn tauri::menu::IsMenuItem<R>> = Vec::new();
+
+    for (language, is_active) in language_items {
+        let item_id = format!("language_{}", language);
+        let item = CheckMenuItem::with_id(app, &item_id, language, true, is_active, None::<String>).unwrap();
+        language_check_items.insert(item_id.clone(), item.clone());
+        language_menu_items.push(Box::leak(Box::new(item)) as &'static dyn tauri::menu::IsMenuItem<R>);
+    }
+
+    let language_submenu = Submenu::with_items(
+        app,
+        "Language",
+        true,
+        &language_menu_items
+    ).unwrap();
+
     let about = MenuItem::with_id(app, "about", "About".to_string(), true, None::<String>).unwrap();
 
     let main_items: Vec<&dyn tauri::menu::IsMenuItem<R>> = vec![
         &quit,
         &separator,
         &audio_submenu,
+        &language_submenu,
         &remove_silence_item,
         &developer_options_separator,
         &developer_options_submenu,
@@ -136,6 +169,7 @@ pub fn create_tray_menu<R: Runtime>(app: &AppHandle<R>) -> (Menu<R>, HashMap<Str
         audio_device_map: Mutex::new(audio_device_map.clone()),
         remove_silence_item: Some(remove_silence_item),
         save_recordings_item: Some(save_recordings_item),
+        language_items: language_check_items, // Store language items in menu state
     };
     
     (menu, audio_device_map.clone(), menu_state)
@@ -213,5 +247,28 @@ fn handle_save_recordings_selection<R: Runtime>(app: AppHandle<R>, save_recordin
     whispr_config.developer.save_recordings = new_state;
     if let Err(e) = config_manager.save_config(&whispr_config, "settings") {
         eprintln!("Failed to save configuration: {}", e);
+    }
+}
+
+fn handle_language_selection<R: Runtime>(app: AppHandle<R>, item: CheckMenuItem<R>, language: &str) {
+    let config_manager = ConfigManager::<WhisprConfig>::new("settings").expect("Failed to create config manager");
+    let mut whispr_config = WhisprConfig::default();
+    
+    if config_manager.config_exists("settings") {
+        match config_manager.load_config("settings") {
+            Ok(config) => whispr_config = config,
+            Err(e) => eprintln!("Failed to load configuration: {}", e),
+        }
+    }
+
+    whispr_config.whisper.language = Some(language.to_string());
+    if let Err(e) = config_manager.save_config(&whispr_config, "settings") {
+        eprintln!("Failed to save configuration: {}", e);
+    }
+
+    // Uncheck all language items
+    let menu_state = app.state::<MenuState<R>>();
+    for (item_id, menu_item) in &menu_state.language_items {
+        menu_item.set_checked(item_id.strip_prefix("language_").unwrap() == language).unwrap();
     }
 }
