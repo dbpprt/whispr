@@ -21,7 +21,7 @@ impl WhisperProcessor {
         })
     }
 
-    pub fn process_audio<R: tauri::Runtime>(&self, captured_audio: Vec<f32>) -> Result<Vec<(f32, f32, String)>, String> {
+    pub fn process_audio(&self, captured_audio: Vec<f32>) -> Result<Vec<(f32, f32, String)>, String> {
         let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 1 });
         params.set_language(self.config.whisper.language.as_deref());
         params.set_translate(self.config.whisper.translate);

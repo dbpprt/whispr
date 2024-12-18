@@ -134,7 +134,7 @@ fn setup_app(app: &mut App<Wry>) -> std::result::Result<(), Box<dyn std::error::
                 let _ = app_handle_clone.emit("status-change", "Transcribing");
                 
                 if let Some(captured_audio) = audio.get_captured_audio(16000, 1) {
-                    if let Err(e) = state.whisper.process_audio::<Wry>(captured_audio) {
+                    if let Err(e) = state.whisper.process_audio(captured_audio) {
                         eprintln!("Failed to process audio: {}", e);
                     }
                 }
