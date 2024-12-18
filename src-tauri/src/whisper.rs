@@ -1,4 +1,4 @@
-use whisper_rs::{WhisperContext, WhisperContextParameters, FullParams, SamplingStrategy};
+use whisper_rs::{WhisperContext, WhisperContextParameters, FullParams, SamplingStrategy, WhisperLogCallback};
 use crate::config::WhisprConfig;
 use std::sync::Arc;
 use std::result::Result;
@@ -8,8 +8,19 @@ pub struct WhisperProcessor {
     config: WhisprConfig,
 }
 
+unsafe extern "C" fn whisper_cpp_log_trampoline(
+    level: u32, // ggml_log_level
+    text: *const std::os::raw::c_char,
+    _: *mut std::os::raw::c_void, // user_data
+) { }
+
 impl WhisperProcessor {
     pub fn new(model_path: &std::path::Path, config: WhisprConfig) -> Result<Self, String> {
+        // Disable whisper logging
+        unsafe {
+            whisper_rs::set_log_callback(Some(whisper_cpp_log_trampoline), std::ptr::null_mut());
+        }
+        
         let ctx = WhisperContext::new_with_params(
             model_path.to_str().ok_or_else(|| "Invalid model path".to_string())?,
             WhisperContextParameters::default()

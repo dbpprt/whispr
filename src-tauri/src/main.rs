@@ -11,7 +11,7 @@ mod whisper;
 use tauri::{Manager, App, AppHandle, Runtime, Wry, Emitter};
 use std::sync::{Arc, Mutex};
 use std::path::Path;
-
+use enigo::{Enigo, Key, Keyboard, Settings};
 use crate::{
     audio::AudioManager,
     window::OverlayWindow,
@@ -137,6 +137,11 @@ fn setup_app(app: &mut App<Wry>) -> std::result::Result<(), Box<dyn std::error::
                     if let Ok(segments) = state.whisper.process_audio(captured_audio) {
                         let transcription: String = segments.iter().map(|(_, _, segment)| segment.clone()).collect::<Vec<String>>().join(" ");
                         println!("{}", transcription);
+
+                        let mut enigo = Enigo::new(&Settings::default()).unwrap();
+                        enigo
+                            .text(&transcription)
+                            .unwrap();
                     } else {
                         eprintln!("Failed to process audio");
                     }
