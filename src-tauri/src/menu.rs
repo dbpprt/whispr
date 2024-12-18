@@ -14,6 +14,7 @@ pub struct MenuState<R: Runtime> {
     pub remove_silence_item: Option<CheckMenuItem<R>>,
     pub save_recordings_item: Option<CheckMenuItem<R>>,
     pub language_items: Mutex<HashMap<String, CheckMenuItem<R>>>,
+    pub translate_item: Option<CheckMenuItem<R>>, // New field for translate item
 }
 
 pub fn handle_menu_event<R: Runtime>(app: &AppHandle<R>, id: &str, menu_state: &MenuState<R>) {
@@ -60,6 +61,11 @@ pub fn handle_menu_event<R: Runtime>(app: &AppHandle<R>, id: &str, menu_state: &
                     }
                 };
                 handle_language_selection(app.clone(), item.clone(), language);
+            }
+        }
+        "translate" => { // New case for translate
+            if let Some(translate_item) = &menu_state.translate_item {
+                handle_translate_selection(app.clone(), translate_item);
             }
         }
         _ => {
@@ -162,6 +168,15 @@ pub fn create_tray_menu<R: Runtime>(app: &AppHandle<R>) -> (Menu<R>, HashMap<Str
         &language_menu_items
     ).unwrap();
 
+    let translate_item = CheckMenuItem::with_id( // New translate item
+        app,
+        "translate",
+        "Translate to English", // Updated display name
+        true,
+        whispr_config.whisper.translate, // Use the translate field from config
+        None::<String>
+    ).unwrap();
+
     let about = MenuItem::with_id(app, "about", "About".to_string(), true, None::<String>).unwrap();
 
     let main_items: Vec<&dyn tauri::menu::IsMenuItem<R>> = vec![
@@ -169,6 +184,7 @@ pub fn create_tray_menu<R: Runtime>(app: &AppHandle<R>) -> (Menu<R>, HashMap<Str
         &separator,
         &audio_submenu,
         &language_submenu,
+        &translate_item, // Add translate item to main items
         &remove_silence_item,
         &developer_options_separator,
         &developer_options_submenu,
@@ -181,6 +197,7 @@ pub fn create_tray_menu<R: Runtime>(app: &AppHandle<R>) -> (Menu<R>, HashMap<Str
         remove_silence_item: Some(remove_silence_item),
         save_recordings_item: Some(save_recordings_item),
         language_items: Mutex::new(language_check_items), // Wrap in Mutex
+        translate_item: Some(translate_item), // Add translate item to menu state
     };
     
     (menu, audio_device_map.clone(), menu_state)
@@ -237,7 +254,7 @@ fn handle_remove_silence_selection<R: Runtime>(app: AppHandle<R>, remove_silence
     }
 }
 
-fn handle_save_recordings_selection<R: Runtime>(app: AppHandle<R>, save_recordings_item: &CheckMenuItem<R>) {
+fn handle_save_recordings_selection<R: Runtime>(_app: AppHandle<R>, save_recordings_item: &CheckMenuItem<R>) {
     let config_manager = ConfigManager::<WhisprConfig>::new("settings").expect("Failed to create config manager");
     let mut whispr_config = WhisprConfig::default();
     
@@ -261,7 +278,7 @@ fn handle_save_recordings_selection<R: Runtime>(app: AppHandle<R>, save_recordin
     }
 }
 
-fn handle_language_selection<R: Runtime>(app: AppHandle<R>, item: CheckMenuItem<R>, language: &str) {
+fn handle_language_selection<R: Runtime>(_app: AppHandle<R>, _item: CheckMenuItem<R>, language: &str) {
     let config_manager = ConfigManager::<WhisprConfig>::new("settings").expect("Failed to create config manager");
     let mut whispr_config = WhisprConfig::default();
     
@@ -278,9 +295,33 @@ fn handle_language_selection<R: Runtime>(app: AppHandle<R>, item: CheckMenuItem<
     }
 
     // Uncheck all language items
-    let menu_state = app.state::<MenuState<R>>();
+    let menu_state = _app.state::<MenuState<R>>();
     let mut language_items = menu_state.language_items.lock().unwrap(); // Lock Mutex
     for (item_id, menu_item) in &mut *language_items {
         menu_item.set_checked(item_id.strip_prefix("language_").unwrap() == language).unwrap();
+    }
+}
+
+fn handle_translate_selection<R: Runtime>(_app: AppHandle<R>, translate_item: &CheckMenuItem<R>) { // New function for translate
+    let config_manager = ConfigManager::<WhisprConfig>::new("settings").expect("Failed to create config manager");
+    let mut whispr_config = WhisprConfig::default();
+    
+    if config_manager.config_exists("settings") {
+        match config_manager.load_config("settings") {
+            Ok(config) => whispr_config = config,
+            Err(e) => eprintln!("Failed to save configuration: {}", e),
+        }
+    }
+
+    let current_state = whispr_config.whisper.translate;
+    let new_state = !current_state;
+
+    println!("Translate before toggle: {}", current_state);
+    translate_item.set_checked(new_state).unwrap();
+    println!("Translate after toggle: {}", new_state);
+
+    whispr_config.whisper.translate = new_state;
+    if let Err(e) = config_manager.save_config(&whispr_config, "settings") {
+        eprintln!("Failed to save configuration: {}", e);
     }
 }

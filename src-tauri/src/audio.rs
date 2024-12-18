@@ -1,5 +1,5 @@
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use cpal::{Device, Host, SampleFormat, Stream, StreamConfig};
+use cpal::{Device, Host, Stream, StreamConfig};
 use hound::{WavWriter, WavSpec};
 use std::sync::{Arc, Mutex};
 use std::fs::File;
@@ -7,9 +7,9 @@ use std::io::BufWriter;
 use crate::config::{ConfigManager, WhisprConfig};
 use chrono::Local;
 use anyhow::Error;
-use std::time::{Instant, Duration};
 use std::collections::VecDeque;
 use samplerate::{convert, ConverterType};
+use std::time::Instant;
 
 fn audio_resample(data: &[f32], sample_rate0: u32, sample_rate: u32, channels: u16) -> Vec<f32> {
     convert(
@@ -54,7 +54,7 @@ pub struct AudioManager {
     is_capturing: Arc<Mutex<bool>>,
     wav_writer: Arc<Mutex<Option<WavWriter<BufWriter<File>>>>>,
     silence_config: Arc<Mutex<SilenceConfig>>,
-    start_time: Arc<Mutex<Option<Instant>>>,
+    _start_time: Arc<Mutex<Option<Instant>>>,
     captured_audio: Arc<Mutex<VecDeque<f32>>>,
 }
 
@@ -77,7 +77,7 @@ impl AudioManager {
             is_capturing: Arc::new(Mutex::new(false)),
             wav_writer: Arc::new(Mutex::new(None)),
             silence_config: Arc::new(Mutex::new(SilenceConfig::default())),
-            start_time: Arc::new(Mutex::new(None)),
+            _start_time: Arc::new(Mutex::new(None)),
             captured_audio: Arc::new(Mutex::new(VecDeque::new())),
         })
     }
@@ -158,15 +158,15 @@ impl AudioManager {
         };
 
         *self.wav_writer.lock().unwrap() = writer;
-        *self.start_time.lock().unwrap() = Some(Instant::now());
+        *self._start_time.lock().unwrap() = Some(Instant::now());
 
         let is_capturing = self.is_capturing.clone();
         let wav_writer = self.wav_writer.clone();
         let silence_config = self.silence_config.clone();
-        let start_time = self.start_time.clone();
+        let _start_time = self._start_time.clone();
         let captured_audio = self.captured_audio.clone();
 
-        let stream = self.build_input_stream_f32(&config, is_capturing, wav_writer, silence_config, start_time, captured_audio)?;
+        let stream = self.build_input_stream_f32(&config, is_capturing, wav_writer, silence_config, _start_time, captured_audio)?;
 
         stream.play()?;
         self.stream = Some(stream);
@@ -187,7 +187,7 @@ impl AudioManager {
             }
         }
 
-        if let Some(start_time) = self.start_time.lock().unwrap().take() {
+        if let Some(start_time) = self._start_time.lock().unwrap().take() {
             let duration = start_time.elapsed();
             println!("Recording stopped after: {:.2}s", duration.as_secs_f32());
         }
@@ -199,7 +199,7 @@ impl AudioManager {
         is_capturing: Arc<Mutex<bool>>,
         wav_writer: Arc<Mutex<Option<WavWriter<BufWriter<File>>>>>,
         silence_config: Arc<Mutex<SilenceConfig>>,
-        start_time: Arc<Mutex<Option<Instant>>>,
+        _start_time: Arc<Mutex<Option<Instant>>>,
         captured_audio: Arc<Mutex<VecDeque<f32>>>,
     ) -> Result<Stream, Error> {
         let mut silence_counter = 0;
