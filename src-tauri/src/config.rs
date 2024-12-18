@@ -106,6 +106,7 @@ pub struct WhisprConfig {
     pub developer: DeveloperSettings,
     pub whisper: WhisperSettings,
     pub start_at_login: bool,
+    pub keyboard_shortcut: String, // New field for keyboard shortcut
 }
 
 impl Default for WhisprConfig {
@@ -115,6 +116,7 @@ impl Default for WhisprConfig {
             developer: DeveloperSettings::default(),
             whisper: WhisperSettings::default(),
             start_at_login: false,
+            keyboard_shortcut: "right_option_key".to_string(), // Default value for keyboard shortcut
         }
     }
 }

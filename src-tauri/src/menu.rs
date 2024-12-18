@@ -18,6 +18,7 @@ pub struct MenuState<R: Runtime> {
     pub translate_item: Option<CheckMenuItem<R>>,
     pub start_at_login_item: Option<CheckMenuItem<R>>,
     pub whisper_logging_item: Option<CheckMenuItem<R>>, // New field for Whisper logging
+    pub keyboard_shortcut_items: Mutex<HashMap<String, CheckMenuItem<R>>>, // New field for Keyboard Shortcut items
 }
 
 pub fn handle_menu_event<R: Runtime>(app: AppHandle<R>, id: &str, menu_state: &MenuState<R>) {
@@ -79,6 +80,20 @@ pub fn handle_menu_event<R: Runtime>(app: AppHandle<R>, id: &str, menu_state: &M
         "whisper_logging" => { // New event handler for Whisper logging
             if let Some(whisper_logging_item) = &menu_state.whisper_logging_item {
                 handle_whisper_logging_selection(&app, whisper_logging_item);
+            }
+        }
+        id if id.starts_with("keyboard_shortcut_") => {
+            let keyboard_shortcut_items = menu_state.keyboard_shortcut_items.lock().unwrap();
+            if let Some(item) = keyboard_shortcut_items.get(id) {
+                let shortcut = match id.strip_prefix("keyboard_shortcut_").unwrap() {
+                    "right_option_key" => "right_option_key",
+                    "right_command_key" => "right_command_key",
+                    _ => {
+                        eprintln!("Error: Unknown keyboard shortcut selected: {}", id);
+                        return;
+                    }
+                };
+                handle_keyboard_shortcut_selection(&app, item.clone(), shortcut);
             }
         }
         _ => {
@@ -208,12 +223,35 @@ pub fn create_tray_menu<R: Runtime>(app: &AppHandle<R>) -> (Menu<R>, HashMap<Str
         None::<String>
     ).unwrap();
 
+    let keyboard_shortcut_items = vec![
+        ("Right Option Key", whispr_config.keyboard_shortcut == "right_option_key"),
+        ("Right Command Key", whispr_config.keyboard_shortcut == "right_command_key"),
+    ];
+
+    let mut keyboard_shortcut_check_items = HashMap::new();
+    let mut keyboard_shortcut_menu_items: Vec<&'static dyn tauri::menu::IsMenuItem<R>> = Vec::new();
+
+    for (shortcut, is_active) in keyboard_shortcut_items {
+        let item_id = format!("keyboard_shortcut_{}", shortcut.to_lowercase().replace(' ', "_"));
+        let item = CheckMenuItem::with_id(app, &item_id, shortcut, true, is_active, None::<String>).unwrap();
+        keyboard_shortcut_check_items.insert(item_id.clone(), item.clone());
+        keyboard_shortcut_menu_items.push(Box::leak(Box::new(item)) as &'static dyn tauri::menu::IsMenuItem<R>);
+    }
+
+    let keyboard_shortcut_submenu = Submenu::with_items(
+        app,
+        "Keyboard Shortcut",
+        true,
+        &keyboard_shortcut_menu_items
+    ).unwrap();
+
     let about = MenuItem::with_id(app, "about", "About".to_string(), true, None::<String>).unwrap();
 
     let main_items: Vec<&dyn tauri::menu::IsMenuItem<R>> = vec![
         &quit,
         &separator,
         &start_at_login_item,
+        &keyboard_shortcut_submenu,
         &separator,
         &audio_submenu,
         &language_submenu,
@@ -233,6 +271,7 @@ pub fn create_tray_menu<R: Runtime>(app: &AppHandle<R>) -> (Menu<R>, HashMap<Str
         translate_item: Some(translate_item),
         start_at_login_item: Some(start_at_login_item),
         whisper_logging_item: Some(whisper_logging_item), // Include Whisper logging item in state
+        keyboard_shortcut_items: Mutex::new(keyboard_shortcut_check_items),
     };
     
     (menu, audio_device_map.clone(), menu_state)
@@ -337,7 +376,7 @@ fn handle_whisper_logging_selection<R: Runtime>(_app: &AppHandle<R>, whisper_log
     }
 }
 
-fn handle_language_selection<R: Runtime>(app: &AppHandle<R>, _item: CheckMenuItem<R>, language: &str) {
+fn handle_language_selection<R: Runtime>(app: &AppHandle<R>, item: CheckMenuItem<R>, language: &str) {
     let config_manager = ConfigManager::<WhisprConfig>::new("settings").expect("Failed to create config manager");
     let mut whispr_config = WhisprConfig::default();
     
@@ -426,5 +465,28 @@ fn handle_start_at_login_selection<R: Runtime>(app: &AppHandle<R>, start_at_logi
     whispr_config.start_at_login = new_state;
     if let Err(e) = config_manager.save_config(&whispr_config, "settings") {
         eprintln!("Failed to save configuration: {}", e);
+    }
+}
+
+fn handle_keyboard_shortcut_selection<R: Runtime>(app: &AppHandle<R>, item: CheckMenuItem<R>, shortcut: &str) {
+    let config_manager = ConfigManager::<WhisprConfig>::new("settings").expect("Failed to create config manager");
+    let mut whispr_config = WhisprConfig::default();
+    
+    if config_manager.config_exists("settings") {
+        match config_manager.load_config("settings") {
+            Ok(config) => whispr_config = config,
+            Err(e) => eprintln!("Failed to load configuration: {}", e),
+        }
+    }
+
+    whispr_config.keyboard_shortcut = shortcut.to_string();
+    if let Err(e) = config_manager.save_config(&whispr_config, "settings") {
+        eprintln!("Failed to save configuration: {}", e);
+    }
+
+    let menu_state = app.state::<MenuState<R>>();
+    let mut keyboard_shortcut_items = menu_state.keyboard_shortcut_items.lock().unwrap();
+    for (item_id, menu_item) in &mut *keyboard_shortcut_items {
+        menu_item.set_checked(item_id == shortcut).unwrap();
     }
 }
