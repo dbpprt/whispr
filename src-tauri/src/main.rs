@@ -138,7 +138,13 @@ fn setup_app(app: &mut App<Wry>) -> std::result::Result<(), Box<dyn std::error::
                         let transcription: String = segments.iter().map(|(_, _, segment)| segment.clone()).collect::<Vec<String>>().join(" ");
                         println!("{}", transcription);
 
-                        let mut enigo = Enigo::new(&Settings::default()).unwrap();
+                        let mut enigo = match Enigo::new(&Settings::default()) {
+                            Ok(enigo) => enigo,
+                            Err(e) => {
+                                eprintln!("Failed to create Enigo instance: {}", e);
+                                return;
+                            }
+                        };
                         if let Err(e) = enigo.text(&transcription) {
                             eprintln!("Failed to send text: {}", e);
                             return;
