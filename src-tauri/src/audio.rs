@@ -8,6 +8,33 @@ use crate::config::{ConfigManager, WhisprConfig};
 use chrono::Local;
 use anyhow::Error;
 use std::time::{Instant, Duration};
+use std::collections::VecDeque;
+use samplerate::{convert, ConverterType};
+
+fn audio_resample(data: &[f32], sample_rate0: u32, sample_rate: u32, channels: u16) -> Vec<f32> {
+    convert(
+        sample_rate0 as _,
+        sample_rate as _,
+        channels as _,
+        ConverterType::SincBestQuality,
+        data,
+    ).unwrap_or_default()
+}
+
+fn stereo_to_mono(stereo_data: &[f32]) -> Vec<f32> {
+    assert_eq!(
+        stereo_data.len() % 2,
+        0,
+        "Stereo data length should be even."
+    );
+
+    let mut mono_data = Vec::with_capacity(stereo_data.len() / 2);
+    for chunk in stereo_data.chunks_exact(2) {
+        let average = (chunk[0] + chunk[1]) / 2.0;
+        mono_data.push(average);
+    }
+    mono_data
+}
 
 #[derive(Clone)]
 pub struct SilenceConfig {
@@ -34,6 +61,7 @@ pub struct AudioManager {
     wav_writer: Arc<Mutex<Option<WavWriter<BufWriter<File>>>>>,
     silence_config: Arc<Mutex<SilenceConfig>>,
     start_time: Arc<Mutex<Option<Instant>>>,
+    captured_audio: Arc<Mutex<VecDeque<f32>>>,
 }
 
 unsafe impl Send for AudioManager {}
@@ -56,6 +84,7 @@ impl AudioManager {
             wav_writer: Arc::new(Mutex::new(None)),
             silence_config: Arc::new(Mutex::new(SilenceConfig::default())),
             start_time: Arc::new(Mutex::new(None)),
+            captured_audio: Arc::new(Mutex::new(VecDeque::new())),
         })
     }
 
@@ -107,14 +136,14 @@ impl AudioManager {
         println!("Default input config: {:?}", default_config);
 
         let config = StreamConfig {
-            channels: 1,
+            channels: default_config.channels(),
             sample_rate: default_config.sample_rate(),
             buffer_size: cpal::BufferSize::Default,
         };
         println!("Using input config: {:?}", config);
 
         let spec = WavSpec {
-            channels: 1,
+            channels: config.channels,
             sample_rate: config.sample_rate.0,
             bits_per_sample: 32,
             sample_format: hound::SampleFormat::Float,
@@ -141,8 +170,9 @@ impl AudioManager {
         let wav_writer = self.wav_writer.clone();
         let silence_config = self.silence_config.clone();
         let start_time = self.start_time.clone();
+        let captured_audio = self.captured_audio.clone();
 
-        let stream = self.build_input_stream_f32(&config, is_capturing, wav_writer, silence_config, start_time)?;
+        let stream = self.build_input_stream_f32(&config, is_capturing, wav_writer, silence_config, start_time, captured_audio)?;
 
         stream.play()?;
         self.stream = Some(stream);
@@ -176,6 +206,7 @@ impl AudioManager {
         wav_writer: Arc<Mutex<Option<WavWriter<BufWriter<File>>>>>,
         silence_config: Arc<Mutex<SilenceConfig>>,
         start_time: Arc<Mutex<Option<Instant>>>,
+        captured_audio: Arc<Mutex<VecDeque<f32>>>,
     ) -> Result<Stream, Error> {
         let mut silence_counter = 0;
         let mut is_in_silence = false;
@@ -198,6 +229,7 @@ impl AudioManager {
                                 silence_counter = 0;
                             }
                             writer.write_sample(sample).unwrap_or_else(|e| eprintln!("Error writing sample: {}", e));
+                            captured_audio.lock().unwrap().push_back(sample);
                         } else {
                             if !is_in_silence {
                                 silence_counter += 1;
@@ -205,6 +237,7 @@ impl AudioManager {
                                     is_in_silence = true;
                                 } else {
                                     writer.write_sample(sample).unwrap_or_else(|e| eprintln!("Error writing sample: {}", e));
+                                    captured_audio.lock().unwrap().push_back(sample);
                                 }
                             }
                         }
@@ -212,6 +245,7 @@ impl AudioManager {
                 } else {
                     for &sample in data {
                         writer.write_sample(sample).unwrap_or_else(|e| eprintln!("Error writing sample: {}", e));
+                        captured_audio.lock().unwrap().push_back(sample);
                     }
                 }
             }
@@ -229,6 +263,37 @@ impl AudioManager {
 
     pub fn set_remove_silence(&mut self, remove_silence: bool) {
         self.configure_silence_removal(remove_silence, None, None);
+    }
+
+    pub fn get_captured_audio(&self, desired_sample_rate: u32, desired_channels: u16) -> Option<Vec<f32>> {
+        let mut audio_buffer = self.captured_audio.lock().unwrap();
+        if audio_buffer.is_empty() {
+            None
+        } else {
+            let audio_data: Vec<f32> = Vec::from_iter(audio_buffer.drain(..));
+            let config = self.input_device.default_input_config().ok()?;
+            let captured_sample_rate = config.sample_rate().0;
+            let captured_channels = config.channels();
+
+            let mut processed_audio = audio_data;
+
+            // Convert stereo to mono if needed
+            if captured_channels > desired_channels {
+                processed_audio = stereo_to_mono(&processed_audio);
+            }
+
+            // Resample if needed
+            if captured_sample_rate != desired_sample_rate {
+                processed_audio = audio_resample(
+                    &processed_audio,
+                    captured_sample_rate,
+                    desired_sample_rate,
+                    desired_channels,
+                );
+            }
+
+            Some(processed_audio)
+        }
     }
 }
 

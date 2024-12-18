@@ -7,6 +7,8 @@ use crate::{
     config::{ConfigManager, WhisprConfig},
     menu::{create_tray_menu, MenuState},
 };
+use whisper_rs::{WhisperContext, WhisperContextParameters, FullParams, SamplingStrategy};
+use std::path::Path;
 
 pub fn initialize_app(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
     let app_handle = app.handle();
@@ -40,6 +42,17 @@ pub fn initialize_app(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
     let audio_manager = Mutex::new(audio_manager);
     app.manage(audio_manager);
     
+    // Load the whisper model once
+    let model_path = Path::new("/Users/dbpprt/Downloads/ggml-large-v3-turbo.bin");
+    let model_path_str = model_path.to_str().expect("Failed to convert path to string");
+    let ctx = WhisperContext::new_with_params(
+        model_path_str,
+        WhisperContextParameters::default()
+    ).expect("failed to load model");
+
+    // Create a params object
+    let params = FullParams::new(SamplingStrategy::Greedy { best_of: 1 });
+
     let app_handle_clone = app_handle.clone();
     let mut hotkey_manager = HotkeyManager::new(move |is_speaking| {
         println!("Speaking state changed: {}", is_speaking);
@@ -61,6 +74,31 @@ pub fn initialize_app(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
                 }
             } else {
                 audio.stop_capture();
+                // Get audio in 16kHz mono format for whisper model
+                if let Some(captured_audio) = audio.get_captured_audio(16000, 1) {
+                    // Run the model
+                    let mut state = ctx.create_state().expect("failed to create state");
+                    state
+                        .full(params.clone(), &captured_audio[..])
+                        .expect("failed to run model");
+
+                    // Fetch the results
+                    let num_segments = state
+                        .full_n_segments()
+                        .expect("failed to get number of segments");
+                    for i in 0..num_segments {
+                        let segment = state
+                            .full_get_segment_text(i)
+                            .expect("failed to get segment");
+                        let start_timestamp = state
+                            .full_get_segment_t0(i)
+                            .expect("failed to get segment start timestamp");
+                        let end_timestamp = state
+                            .full_get_segment_t1(i)
+                            .expect("failed to get segment end timestamp");
+                        println!("[{} - {}]: {}", start_timestamp, end_timestamp, segment);
+                    }
+                }
             }
         }
     });
