@@ -8,6 +8,7 @@ use crate::audio::AudioManager;
 use crate::config::{ConfigManager, WhisprConfig};
 use tauri_plugin_shell::ShellExt;
 use tauri_plugin_autostart::ManagerExt;
+use tauri_plugin_dialog::{DialogExt, MessageDialogButtons}; // Added import for tauri_plugin_dialog
 
 #[derive(Default)]
 pub struct MenuState<R: Runtime> {
@@ -479,6 +480,7 @@ fn handle_keyboard_shortcut_selection<R: Runtime>(app: &AppHandle<R>, item: Chec
         }
     }
 
+    let current_keyboard_shortcut = whispr_config.keyboard_shortcut;
     whispr_config.keyboard_shortcut = shortcut.to_string();
     if let Err(e) = config_manager.save_config(&whispr_config, "settings") {
         eprintln!("Failed to save configuration: {}", e);
@@ -488,5 +490,22 @@ fn handle_keyboard_shortcut_selection<R: Runtime>(app: &AppHandle<R>, item: Chec
     let mut keyboard_shortcut_items = menu_state.keyboard_shortcut_items.lock().unwrap();
     for (item_id, menu_item) in &mut *keyboard_shortcut_items {
         menu_item.set_checked(item_id == shortcut).unwrap();
+    }
+
+    // Show dialog
+    let answer = app.dialog()
+        .message("Application must be restarted for changes to take effect")
+        .title("Restart Required")
+        .buttons(MessageDialogButtons::OkCancel)
+        .blocking_show();
+
+    if answer {
+        println!("User clicked Ok");
+        // TODO: Close the application
+    } else {
+        whispr_config.keyboard_shortcut = current_keyboard_shortcut;
+        if let Err(e) = config_manager.save_config(&whispr_config, "settings") {
+            eprintln!("Failed to revert configuration: {}", e);
+        }
     }
 }
