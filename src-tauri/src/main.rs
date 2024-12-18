@@ -6,11 +6,11 @@ mod window;
 mod audio;
 mod config;
 mod menu;
+mod whisper;
 
 use tauri::{Manager, App, AppHandle, Runtime, Wry, Emitter};
 use std::sync::{Arc, Mutex};
 use std::path::Path;
-use whisper_rs::{WhisperContext, WhisperContextParameters, FullParams, SamplingStrategy};
 
 use crate::{
     audio::AudioManager,
@@ -18,6 +18,7 @@ use crate::{
     hotkey::HotkeyManager,
     config::{ConfigManager, WhisprConfig},
     menu::{create_tray_menu, MenuState},
+    whisper::WhisperProcessor,
 };
 
 #[derive(thiserror::Error, Debug)]
@@ -36,54 +37,6 @@ pub enum WhisprError {
 
 type Result<T> = std::result::Result<T, WhisprError>;
 
-struct WhisperProcessor {
-    ctx: Arc<WhisperContext>,
-    config: WhisprConfig,
-}
-
-impl WhisperProcessor {
-    fn new(model_path: &Path, config: WhisprConfig) -> Result<Self> {
-        let ctx = WhisperContext::new_with_params(
-            model_path.to_str().ok_or_else(|| WhisprError::SystemError("Invalid model path".into()))?,
-            WhisperContextParameters::default()
-        ).map_err(|e| WhisprError::WhisperError(e.to_string()))?;
-
-        Ok(Self {
-            ctx: Arc::new(ctx),
-            config,
-        })
-    }
-
-    fn process_audio<R: Runtime>(&self, captured_audio: Vec<f32>, app_handle: &AppHandle<R>) -> Result<()> {
-        let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 1 });
-        params.set_language(self.config.whisper.language.as_deref());
-        params.set_translate(self.config.whisper.translate);
-
-        let mut state = self.ctx.create_state()
-            .map_err(|e| WhisprError::WhisperError(e.to_string()))?;
-
-        state.full(params, &captured_audio[..])
-            .map_err(|e| WhisprError::WhisperError(e.to_string()))?;
-
-        let num_segments = state.full_n_segments()
-            .map_err(|e| WhisprError::WhisperError(e.to_string()))?;
-
-        for i in 0..num_segments {
-            let segment = state.full_get_segment_text(i)
-                .map_err(|e| WhisprError::WhisperError(e.to_string()))?;
-            let start = state.full_get_segment_t0(i)
-                .map_err(|e| WhisprError::WhisperError(e.to_string()))?;
-            let end = state.full_get_segment_t1(i)
-                .map_err(|e| WhisprError::WhisperError(e.to_string()))?;
-
-            println!("[{} - {}]: {}", start, end, segment);
-            app_handle.emit("transcription-complete", segment)
-                .map_err(|e| WhisprError::SystemError(e.to_string()))?;
-        }
-        Ok(())
-    }
-}
-
 struct AppState {
     whisper: WhisperProcessor,
     audio: Mutex<AudioManager>,
@@ -96,7 +49,8 @@ impl AppState {
             .map_err(|e| WhisprError::AudioError(e.to_string()))?;
         
         let model_path = Path::new("/Users/dbpprt/Downloads/ggml-large-v3-turbo.bin");
-        let whisper = WhisperProcessor::new(model_path, config)?;
+        let whisper = WhisperProcessor::new(model_path, config)
+            .map_err(|e| WhisprError::WhisperError(e))?;
 
         Ok(Self {
             whisper,
@@ -180,7 +134,7 @@ fn setup_app(app: &mut App<Wry>) -> std::result::Result<(), Box<dyn std::error::
                 let _ = app_handle_clone.emit("status-change", "Transcribing");
                 
                 if let Some(captured_audio) = audio.get_captured_audio(16000, 1) {
-                    if let Err(e) = state.whisper.process_audio(captured_audio, &app_handle_clone) {
+                    if let Err(e) = state.whisper.process_audio::<Wry>(captured_audio) {
                         eprintln!("Failed to process audio: {}", e);
                     }
                 }
@@ -188,8 +142,9 @@ fn setup_app(app: &mut App<Wry>) -> std::result::Result<(), Box<dyn std::error::
         }
     });
 
-    hotkey_manager.start()
-        .map_err(|e| Box::new(WhisprError::HotkeyError(e.to_string())) as Box<dyn std::error::Error>)?;
+    if let Err(e) = hotkey_manager.start() {
+        eprintln!("Failed to start hotkey manager: {}", e);
+    }
 
     Ok(())
 }
