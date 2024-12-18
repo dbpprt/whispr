@@ -1,3 +1,5 @@
+use tauri::Runtime;
+
 mod hotkey;
 mod window;
 mod audio;
@@ -10,8 +12,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .setup(|app| {
-            setup::initialize_app(app)?;
-            Ok(())
+            setup::initialize_app(app)
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

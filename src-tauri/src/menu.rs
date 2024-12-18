@@ -7,6 +7,7 @@ use std::sync::Mutex;
 use std::collections::HashMap;
 use crate::audio::AudioManager;
 use crate::config::{ConfigManager, AudioConfig};
+use tauri_plugin_shell::ShellExt;
 
 #[derive(Default)]
 pub struct MenuState<R: Runtime> {
@@ -38,6 +39,20 @@ pub fn handle_menu_event<R: Runtime>(app: &AppHandle<R>, id: &str, menu_state: &
             if let Some(save_recordings_item) = &menu_state.save_recordings_item {
                 handle_save_recordings_selection(app.clone(), save_recordings_item);
             }
+        }
+        "about" => {
+            // #[cfg(target_os = "windows")]
+            // let _ = app.shell().command("cmd")
+            //     .args(&["/C", "start", "https://github.com/dbpprt/whispr"])
+            //     .spawn();
+            // #[cfg(target_os = "linux")]
+            // let _ = app.shell().command("xdg-open")
+            //     .args(&["https://github.com/dbpprt/whispr"])
+            //     .spawn();
+            // #[cfg(target_os = "macos")]
+            let _ = app.shell().command("open")
+                .args(&["https://github.com/dbpprt/whispr"])
+                .spawn();
         }
         _ => {
             eprintln!("Warning: Unhandled menu item: {:?}", id);
@@ -113,6 +128,8 @@ pub fn create_tray_menu<R: Runtime>(app: &AppHandle<R>) -> (Menu<R>, HashMap<Str
         true,
         &[&save_recordings_item as &dyn tauri::menu::IsMenuItem<R>]
     ).unwrap();
+    
+    let about = MenuItem::with_id(app, "about", "About".to_string(), true, None::<String>).unwrap();
 
     let main_items: Vec<&dyn tauri::menu::IsMenuItem<R>> = vec![
         &quit,
@@ -121,6 +138,7 @@ pub fn create_tray_menu<R: Runtime>(app: &AppHandle<R>) -> (Menu<R>, HashMap<Str
         &remove_silence_item,
         &developer_options_separator,
         &developer_options_submenu,
+        &about,
     ];
 
     let menu = Menu::with_items(app, &main_items).unwrap();
