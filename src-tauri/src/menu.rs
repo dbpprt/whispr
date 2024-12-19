@@ -509,6 +509,9 @@ fn handle_keyboard_shortcut_selection<R: Runtime>(app: &AppHandle<R>, item: Chec
                 for (item_id, menu_item) in &menu_state.keyboard_shortcut_items {
                     menu_item.set_checked(item_id.strip_prefix("keyboard_shortcut_").unwrap() == target_shortcut).unwrap();
                 }
+
+                // Restart the app
+                app_handle.restart();
             } else {
                 // Revert the menu item state to the previous shortcut
                 let menu_state = app_handle.state::<MenuState<R>>();
@@ -516,5 +519,5 @@ fn handle_keyboard_shortcut_selection<R: Runtime>(app: &AppHandle<R>, item: Chec
                     menu_item.set_checked(item_id.strip_prefix("keyboard_shortcut_").unwrap() == current_shortcut).unwrap();
                 }
             }
-        });
+        }); - -
 }

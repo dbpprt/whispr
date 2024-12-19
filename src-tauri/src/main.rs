@@ -51,7 +51,7 @@ impl AppState {
         let model_path = Path::new("/Users/dbpprt/Downloads/ggml-large-v3-turbo.bin");
         let whisper = WhisperProcessor::new(model_path, config)
             .map_err(|e| WhisprError::WhisperError(e))?;
- 
+     
         Ok(Self {
             whisper,
             audio: Mutex::new(audio_manager),
@@ -164,7 +164,7 @@ fn setup_app(app: &mut App<Wry>) -> std::result::Result<(), Box<dyn std::error::
                 }
             }
         }
-    });
+    }, whispr_config.clone());
 
     if let Err(e) = hotkey_manager.start() {
         eprintln!("Failed to start hotkey manager: {}", e);
@@ -180,6 +180,7 @@ fn main() {
         .plugin(tauri_plugin_positioner::init())
         .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, None))
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_process::init())  // Register the process plugin
         .setup(setup_app)
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
