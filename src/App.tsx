@@ -4,14 +4,14 @@ import { listen } from '@tauri-apps/api/event';
 function App() {
   const [isActive, setIsActive] = useState(false);
   const [heights, setHeights] = useState(() => 
-    Array.from({ length: 60 }, () => 0.2)
+    Array.from({ length: 35 }, () => 0.2)
   );
 
   useEffect(() => {
     let animationFrame: number;
 
     let time = 0;
-    const animate = () => {
+    const animate = () => { 
       time += 0.02;
       setHeights(prevHeights => 
         prevHeights.map((_, i) => {
@@ -21,7 +21,7 @@ function App() {
           const secondWave = Math.sin(i * 0.1 - time * 0.7) * 0.15;
           // Random variation
           const noise = Math.sin(time * 0.3 + i * 2) * 0.1;
-          
+
           if (isActive) {
             return 0.4 + baseWave + secondWave + noise;
           }
@@ -30,7 +30,7 @@ function App() {
       );
       animationFrame = setTimeout(() => {
         animationFrame = requestAnimationFrame(animate);
-      }, 50); // Slower animation
+      }, 15); // Faster animation
     };
 
     animate();
@@ -55,6 +55,7 @@ function App() {
 
   return (
     <div className={`App ${isActive ? 'active' : ''}`}>
+      <img src="/src/icon.png" className="tauri-icon" alt="Tauri logo" />
       <div className="waveform-container">
         <div className="waveform">
           {heights.map((height, i) => (

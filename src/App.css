@@ -15,7 +15,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  overflow: hidden;ou.  Thank you.
+  overflow: hidden;
 }
 
 .App {
@@ -33,10 +33,10 @@ body {
 
 .waveform-container {
   position: absolute;
-  width: calc(100% - 120px);
+  width: calc(100% - 144px);
   height: 80px;
-  left: 60px;
-  right: 60px;
+  left: 69px;
+  right: 75px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -48,7 +48,6 @@ body {
   display: flex;
   align-items: center;
   gap: 2px;
-  padding: 0 25px;
 }
 
 .bar {
@@ -76,6 +75,8 @@ body {
 .microphone svg {
   fill: rgba(255, 255, 255, 0.4);
   transition: fill 0.3s ease;
+  width: 24px;
+  height: 24px;
 }
 
 .App.active .microphone {
@@ -84,4 +85,18 @@ body {
 
 .App.active .microphone svg {
   fill: rgba(255, 255, 255, 0.8);
+}
+
+.tauri-icon {
+  position: absolute;
+  right: 25px;
+  top: calc(50% - 18px);
+  width: 36px;
+  height: 36px;
+  opacity: 0.6;
+  transition: opacity 0.3s ease;
+}
+
+.App.active .tauri-icon {
+  opacity: 1;
 }
