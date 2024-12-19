@@ -519,5 +519,5 @@ fn handle_keyboard_shortcut_selection<R: Runtime>(app: &AppHandle<R>, item: Chec
                     menu_item.set_checked(item_id.strip_prefix("keyboard_shortcut_").unwrap() == current_shortcut).unwrap();
                 }
             }
-        }); - -
+        });
 }
