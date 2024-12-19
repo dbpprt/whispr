@@ -5248,7 +5248,7 @@ dependencies = [
  "block",
  "chrono",
  "cocoa 0.25.0",
- "core-foundation 0.9.4",
+ "core-foundation 0.10.0",
  "cpal",
  "dirs 4.0.0",
  "enigo",
