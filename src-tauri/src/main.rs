@@ -95,7 +95,7 @@ fn setup_app(app: &mut App<Wry>) -> std::result::Result<(), Box<dyn std::error::
     app.manage(state);
 
     // Setup tray and menu
-    let (tray_menu, _, menu_state) = create_tray_menu(&app_handle);
+    let (tray_menu, menu_state) = create_tray_menu(&app_handle);
     app.manage(menu_state);
 
     let handle_clone = app_handle.clone();

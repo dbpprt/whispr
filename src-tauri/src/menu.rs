@@ -2,7 +2,6 @@ use tauri::{
     AppHandle, Manager, Runtime,
     menu::{Menu, MenuItem, Submenu, CheckMenuItem, PredefinedMenuItem},
 };
-use std::sync::Mutex;
 use std::collections::HashMap;
 use crate::audio::AudioManager;
 use crate::config::{ConfigManager, WhisprConfig};
@@ -12,14 +11,14 @@ use tauri_plugin_dialog::{DialogExt, MessageDialogButtons}; // Added import for 
 
 #[derive(Default)]
 pub struct MenuState<R: Runtime> {
-    pub audio_device_map: Mutex<HashMap<String, CheckMenuItem<R>>>,
+    pub audio_device_map: HashMap<String, CheckMenuItem<R>>,
     pub remove_silence_item: Option<CheckMenuItem<R>>,
     pub save_recordings_item: Option<CheckMenuItem<R>>,
-    pub language_items: Mutex<HashMap<String, CheckMenuItem<R>>>,
+    pub language_items: HashMap<String, CheckMenuItem<R>>,
     pub translate_item: Option<CheckMenuItem<R>>,
     pub start_at_login_item: Option<CheckMenuItem<R>>,
     pub whisper_logging_item: Option<CheckMenuItem<R>>, // New field for Whisper logging
-    pub keyboard_shortcut_items: Mutex<HashMap<String, CheckMenuItem<R>>>, // New field for Keyboard Shortcut items
+    pub keyboard_shortcut_items: HashMap<String, CheckMenuItem<R>>, // New field for Keyboard Shortcut items
 }
 
 pub fn handle_menu_event<R: Runtime>(app: AppHandle<R>, id: &str, menu_state: &MenuState<R>) {
@@ -34,9 +33,8 @@ pub fn handle_menu_event<R: Runtime>(app: AppHandle<R>, id: &str, menu_state: &M
             }
         }
         id if id.starts_with("audio_device_") => {
-            let audio_device_map = menu_state.audio_device_map.lock().unwrap();
             if let Some(device_id) = id.strip_prefix("audio_device_") {
-                handle_audio_device_selection(&app, device_id, &audio_device_map);
+                handle_audio_device_selection(&app, device_id, &menu_state.audio_device_map);
             } else {
                 eprintln!("Warning: Invalid audio device ID format: {:?}", id);
             }
@@ -52,8 +50,7 @@ pub fn handle_menu_event<R: Runtime>(app: AppHandle<R>, id: &str, menu_state: &M
                 .spawn();
         }
         id if id.starts_with("language_") => {
-            let language_items = menu_state.language_items.lock().unwrap();
-            if let Some(item) = language_items.get(id) {
+            if let Some(item) = menu_state.language_items.get(id) {
                 let language = match id.strip_prefix("language_").unwrap() {
                     "Automatic" => "auto",
                     "English" => "en",
@@ -84,8 +81,7 @@ pub fn handle_menu_event<R: Runtime>(app: AppHandle<R>, id: &str, menu_state: &M
             }
         }
         id if id.starts_with("keyboard_shortcut_") => {
-            let keyboard_shortcut_items = menu_state.keyboard_shortcut_items.lock().unwrap();
-            if let Some(item) = keyboard_shortcut_items.get(id) {
+            if let Some(item) = menu_state.keyboard_shortcut_items.get(id) {
                 let shortcut = match id.strip_prefix("keyboard_shortcut_").unwrap() {
                     "right_option_key" => "right_option_key",
                     "right_command_key" => "right_command_key",
@@ -103,7 +99,7 @@ pub fn handle_menu_event<R: Runtime>(app: AppHandle<R>, id: &str, menu_state: &M
     }
 }
 
-pub fn create_tray_menu<R: Runtime>(app: &AppHandle<R>) -> (Menu<R>, HashMap<String, CheckMenuItem<R>>, MenuState<R>) {
+pub fn create_tray_menu<R: Runtime>(app: &AppHandle<R>) -> (Menu<R>, MenuState<R>) {
     let separator = PredefinedMenuItem::separator(app).unwrap();
     let quit = MenuItem::with_id(app, "quit", "Quit".to_string(), true, None::<String>).unwrap();
 
@@ -265,17 +261,17 @@ pub fn create_tray_menu<R: Runtime>(app: &AppHandle<R>) -> (Menu<R>, HashMap<Str
 
     let menu = Menu::with_items(app, &main_items).unwrap();
     let menu_state = MenuState {
-        audio_device_map: Mutex::new(audio_device_map.clone()),
+        audio_device_map,
         remove_silence_item: Some(remove_silence_item),
         save_recordings_item: Some(save_recordings_item),
-        language_items: Mutex::new(language_check_items),
+        language_items: language_check_items,
         translate_item: Some(translate_item),
         start_at_login_item: Some(start_at_login_item),
         whisper_logging_item: Some(whisper_logging_item), // Include Whisper logging item in state
-        keyboard_shortcut_items: Mutex::new(keyboard_shortcut_check_items),
+        keyboard_shortcut_items: keyboard_shortcut_check_items,
     };
     
-    (menu, audio_device_map.clone(), menu_state)
+    (menu, menu_state)
 }
 
 fn handle_audio_device_selection<R: Runtime>(app: &AppHandle<R>, id: &str, audio_device_map: &HashMap<String, CheckMenuItem<R>>) {
@@ -378,26 +374,37 @@ fn handle_whisper_logging_selection<R: Runtime>(_app: &AppHandle<R>, whisper_log
 }
 
 fn handle_language_selection<R: Runtime>(app: &AppHandle<R>, item: CheckMenuItem<R>, language: &str) {
+    println!("handle_language_selection called with language: {}", language);
     let config_manager = ConfigManager::<WhisprConfig>::new("settings").expect("Failed to create config manager");
+    println!("ConfigManager created");
     let mut whispr_config = WhisprConfig::default();
-    
+    println!("WhisprConfig initialized");
+
     if config_manager.config_exists("settings") {
         match config_manager.load_config("settings") {
-            Ok(config) => whispr_config = config,
-            Err(e) => eprintln!("Failed to load configuration: {}", e),
+            Ok(config) => {
+                whispr_config = config;
+                println!("Configuration loaded successfully");
+            }
+            Err(e) => {
+                eprintln!("Failed to load configuration: {}", e);
+                return;
+            }
         }
     }
 
     whispr_config.whisper.language = Some(language.to_string());
+    println!("Language updated to: {}", language);
     if let Err(e) = config_manager.save_config(&whispr_config, "settings") {
         eprintln!("Failed to save configuration: {}", e);
+        return;
     }
 
     let menu_state = app.state::<MenuState<R>>();
-    let mut language_items = menu_state.language_items.lock().unwrap();
-    for (item_id, menu_item) in &mut *language_items {
+    for (item_id, menu_item) in &menu_state.language_items {
         menu_item.set_checked(item_id.strip_prefix("language_").unwrap() == language).unwrap();
     }
+    println!("Menu items updated");
 }
 
 fn handle_translate_selection<R: Runtime>(_app: &AppHandle<R>, translate_item: &CheckMenuItem<R>) {
@@ -487,8 +494,7 @@ fn handle_keyboard_shortcut_selection<R: Runtime>(app: &AppHandle<R>, item: Chec
     }
 
     let menu_state = app.state::<MenuState<R>>();
-    let mut keyboard_shortcut_items = menu_state.keyboard_shortcut_items.lock().unwrap();
-    for (item_id, menu_item) in &mut *keyboard_shortcut_items {
+    for (item_id, menu_item) in &menu_state.keyboard_shortcut_items {
         menu_item.set_checked(item_id == shortcut).unwrap();
     }
 
