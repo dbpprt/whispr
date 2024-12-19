@@ -1,0 +1,102 @@
+:root {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 400;
+  color: #ffffff;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  width: 100vw;
+  height: 100vh;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.App {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.waveform-container {
+  position: absolute;
+  width: calc(100% - 144px);
+  height: 80px;
+  left: 69px;
+  right: 75px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.waveform {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.bar {
+  flex: 1;
+  min-width: 2px;
+  background: rgba(255, 255, 255, 0.4);
+  transition: transform 0.15s ease-out;
+  transform-origin: center;
+  border-radius: 2px;
+}
+
+.bar.active {
+  background: rgba(255, 255, 255, 0.8);
+}
+
+.microphone {
+  position: absolute;
+  left: 25px;
+  top: calc(50% - 12px);
+  transform: none;
+  opacity: 0.6;
+  transition: opacity 0.3s ease;
+}
+
+.microphone svg {
+  fill: rgba(255, 255, 255, 0.4);
+  transition: fill 0.3s ease;
+  width: 24px;
+  height: 24px;
+}
+
+.App.active .microphone {
+  opacity: 1;
+}
+
+.App.active .microphone svg {
+  fill: rgba(255, 255, 255, 0.8);
+}
+
+.tauri-icon {
+  position: absolute;
+  right: 25px;
+  top: calc(50% - 18px);
+  width: 36px;
+  height: 36px;
+  opacity: 0.6;
+  transition: opacity 0.3s ease;
+}
+
+.App.active .tauri-icon {
+  opacity: 1;
+}

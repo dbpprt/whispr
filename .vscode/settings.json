@@ -1,5 +1,14 @@
 {
   "emmet.includeLanguages": {
     "rust": "html"
-  }
+  },
+  "rust-analyzer.cargo.workspaceRoot": "${workspaceFolder}/src-tauri",
+  "cSpell.words": [
+    "autolaunch",
+    "Enigo",
+    "ggml",
+    "tauri",
+    "thiserror",
+    "Whispr"
+  ]
 }

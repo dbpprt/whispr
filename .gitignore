@@ -1,3 +1,36 @@
-/dist/
+# VSCode
+*.code-workspace
+*.vscode-test/
+
+# Rust
 /target/
 /Cargo.lock
+
+# TypeScript
+*.tsbuildinfo
+*.d.ts
+*.js
+*.js.map
+*.d.ts.map
+*.tsbuildinfo
+
+# Tauri
+src-tauri/target/
+src-tauri/build/
+src-tauri/node_modules/
+src-tauri/.env
+src-tauri/.env.*
+
+# Node.js
+node_modules/
+package-lock.json
+yarn.lock
+
+# macOS
+.DS_Store
+
+# Logs
+*.log
+
+# Build Artifacts
+/dist/

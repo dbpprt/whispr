@@ -1,68 +1,88 @@
 use cocoa::base::id;
 use objc::{class, msg_send, sel, sel_impl};
+use objc::runtime::Sel;
 use anyhow::Result;
 use std::sync::Arc;
+use std::collections::HashMap;
+use crate::config::WhisprConfig;
 
 type NSUInteger = libc::c_ulong;
 
+const NSEVENT_MASK_FLAGS_CHANGED: NSUInteger = 1 << 12;
+
 pub struct HotkeyManager {
-    #[allow(dead_code)]
-    monitor: Option<*mut std::ffi::c_void>, // Keep monitor alive as raw pointer
+    monitors: Vec<*mut std::ffi::c_void>,
     callback: Arc<dyn Fn(bool) + Send + Sync>,
+    key_code: u16,
+    key_mask: NSUInteger,
 }
 
-const NSEVENT_MASK_FLAGS_CHANGED: NSUInteger = 1 << 12;
-const RIGHT_OPTION_KEY_CODE: u16 = 61;
-const OPTION_KEY_FLAG: NSUInteger = 1 << 19;
-const RIGHT_OPTION_MASK: NSUInteger = 0x040;
-
 impl HotkeyManager {
-    pub fn new<F>(callback: F) -> Self 
+    pub fn new<F>(callback: F, config: WhisprConfig) -> Self 
     where
         F: Fn(bool) + Send + Sync + 'static,
     {
         println!("HotkeyManager: Initializing");
+        let (key_code, key_mask) = Self::get_key_code_and_mask(&config.keyboard_shortcut);
+        println!("HotkeyManager: Using key_code: {}, key_mask: {}, and shortcut: {}", key_code, key_mask, config.keyboard_shortcut);
         HotkeyManager {
-            monitor: None,
+            monitors: Vec::new(),
             callback: Arc::new(callback),
+            key_code,
+            key_mask,
         }
     }
 
-    pub fn start(&mut self) -> Result<()> {
-        println!("HotkeyManager: Starting event monitor");
+    fn get_key_code_and_mask(shortcut: &str) -> (u16, NSUInteger) {
+        let key_map: HashMap<&str, (u16, NSUInteger)> = [
+            // Key mappings for different shortcuts
+            ("right_option_key", (61, 1 << 19)), // Right Option key
+            ("right_command_key", (54, 1 << 20)), // Right Command key
+            // Add more key mappings as needed
+        ]
+        .iter()
+        .cloned()
+        .collect();
+
+        *key_map.get(shortcut).unwrap()
+    }
+
+    fn add_monitor(&mut self, monitor_selector: Sel) -> Result<()> {
         let callback = self.callback.clone();
-
-        unsafe {
-            let monitor: id = msg_send![
-                class!(NSEvent),
-                addGlobalMonitorForEventsMatchingMask: NSEVENT_MASK_FLAGS_CHANGED
-                handler: block::ConcreteBlock::new(move |event: id| {
-                    if !event.is_null() {
-                        let key_code: u16 = msg_send![event, keyCode];
-                        
-                        // Only handle right option key
-                        if key_code == RIGHT_OPTION_KEY_CODE {
-                            let flags: NSUInteger = msg_send![event, modifierFlags];
-                            let is_pressed = (flags & OPTION_KEY_FLAG) != 0  // Option key flag
-                                && (flags & RIGHT_OPTION_MASK) != 0;  // Right option key mask
-                            
-                            println!("HotkeyManager: Right Option key - pressed: {}", is_pressed);
-                            callback(is_pressed);
-                        }
+        let key_code = self.key_code;
+        let key_mask = self.key_mask;
+        let monitor: id = unsafe {
+            let handler = block::ConcreteBlock::new(move |event: id| {
+                if !event.is_null() {
+                    let event_key_code: u16 = msg_send![event, keyCode];
+                    if event_key_code == key_code {
+                        let flags: NSUInteger = msg_send![event, modifierFlags];
+                        let is_pressed = flags & key_mask != 0;
+                        println!("HotkeyManager: Key - pressed: {}", is_pressed);
+                        callback(is_pressed);
                     }
-                })
-                .copy()
-            ];
+                }
+            })
+            .copy();
+            
+            msg_send![class!(NSEvent), performSelector:monitor_selector 
+                withObject:NSEVENT_MASK_FLAGS_CHANGED 
+                withObject:handler]
+        };
 
-            if monitor.is_null() {
-                println!("HotkeyManager: Failed to create event monitor");
-                return Err(anyhow::anyhow!("Failed to create event monitor"));
-            }
-
-            println!("HotkeyManager: Event monitor created successfully");
-            self.monitor = Some(monitor as *mut std::ffi::c_void);
+        if monitor.is_null() {
+            return Err(anyhow::anyhow!("Failed to create event monitor"));
         }
 
+        self.monitors.push(monitor as *mut std::ffi::c_void);
+        println!("HotkeyManager: Event monitor created");
+        Ok(())
+    }
+
+    pub fn start(&mut self) -> Result<()> {
+        println!("HotkeyManager: Starting event monitors");
+        self.add_monitor(sel!(addGlobalMonitorForEventsMatchingMask:handler:))?;
+        self.add_monitor(sel!(addLocalMonitorForEventsMatchingMask:handler:))?;
         Ok(())
     }
 }

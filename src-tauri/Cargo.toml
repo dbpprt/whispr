@@ -1,35 +1,46 @@
 [package]
 name = "whispr"
-version = "0.1.0"
-description = "A Tauri App"
-authors = ["you"]
+version = "0.0.1"
+description = "Privacy-focused menubar app for local voice-to-text transcription"
+authors = ["Dennis Bappert"]
 edition = "2021"
-
-[lib]
-name = "whispr_lib"
-crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = [ "macos-private-api", "tray-icon"] }
-tauri-plugin-shell = { git = "https://github.com/tauri-apps/plugins-workspace", branch = "v2" }
+tauri = { version = "2", features = [ "macos-private-api", "tray-icon", "unstable" ] }
+tauri-plugin-shell = { version = "2" }
 tauri-plugin-global-shortcut = { git = "https://github.com/tauri-apps/plugins-workspace", branch = "v2" }
+tauri-plugin-positioner = "2.2.0"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio = { version = "1", features = ["full"] }
 objc = "0.2"
-whisper-rs = "0.13.2"
 anyhow = "1.0"
+thiserror = "2.0"
 cpal = "0.15"  # For audio capture
 ringbuf = "0.4.7"  # For audio buffer management
 toml = "0.8.19"
-raw-window-handle = "0.5.2"
-window-vibrancy = "0.4.3"
-core-foundation = "0.9.4"
-cocoa = "0.25.0"
-global-hotkey = "0.4.2"
+raw-window-handle = "0.6.2"
+window-vibrancy = "0.5.2"
+core-foundation = "0.10.0"
+cocoa = "0.26.0"
+global-hotkey = "0.6.3"
 block = "0.1"
 libc = "0.2"
 once_cell = "1.19"
+hound = "3.5"  # For WAV file handling
+tempfile = "3.3.0"  # For creating temporary files in tests
+dirs = "5.0.1"  # For accessing standard directories like home directory
+chrono = "0.4"
+whisper-rs = { version = "0.13.1", features = ["metal"] }
+fon = "0.6.0"
+samplerate = "0.2.4"
+tauri-plugin-autostart = "2.0.0"
+enigo = "0.3.0"
+tauri-plugin-dialog = "2.0.0"
+tauri-plugin-process = "2.0.0"
+tauri-plugin-single-instance = "2.0.0"
+reqwest = { version = "0.11", features = ["stream"] }
+futures-util = "0.3"
