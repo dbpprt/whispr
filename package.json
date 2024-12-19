@@ -11,13 +11,13 @@
   },
   "dependencies": {
     "react": "^19.0.0",
-    "react-dom": "^18.2.0",
+    "react-dom": "^19.0.0",
     "@tauri-apps/api": "^2.0.0-beta"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.0.0-beta",
-    "@types/react": "^18.2.15",
-    "@types/react-dom": "^19.0.1",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.0.3",
     "typescript": "^5.0.2",
     "vite": "^6.0.4"
