@@ -94,7 +94,7 @@ dependencies = [
  "futures-channel",
  "futures-util",
  "rand 0.8.5",
- "raw-window-handle 0.6.2",
+ "raw-window-handle",
  "serde",
  "serde_repr",
  "tokio",
@@ -2534,7 +2534,7 @@ dependencies = [
  "log",
  "ndk-sys 0.6.0+11769913",
  "num_enum",
- "raw-window-handle 0.6.2",
+ "raw-window-handle",
  "thiserror 1.0.69",
 ]
 
@@ -3431,12 +3431,6 @@ dependencies = [
 
 [[package]]
 name = "raw-window-handle"
-version = "0.5.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f2ff9a1f06a88b01621b7ae906ef0211290d1c8a168a15542486a8f61c0833b9"
-
-[[package]]
-name = "raw-window-handle"
 version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "20675572f6f24e9e76ef639bc5552774ed45f1c30e2951e1e99c59888861c539"
@@ -3543,7 +3537,7 @@ dependencies = [
  "objc2",
  "objc2-app-kit",
  "objc2-foundation",
- "raw-window-handle 0.6.2",
+ "raw-window-handle",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
@@ -3933,7 +3927,7 @@ dependencies = [
  "objc2",
  "objc2-foundation",
  "objc2-quartz-core",
- "raw-window-handle 0.6.2",
+ "raw-window-handle",
  "redox_syscall",
  "wasm-bindgen",
  "web-sys",
@@ -4104,7 +4098,7 @@ dependencies = [
  "objc",
  "once_cell",
  "parking_lot",
- "raw-window-handle 0.6.2",
+ "raw-window-handle",
  "scopeguard",
  "tao-macros",
  "unicode-segmentation",
@@ -4159,7 +4153,7 @@ dependencies = [
  "objc2-foundation",
  "percent-encoding",
  "plist",
- "raw-window-handle 0.6.2",
+ "raw-window-handle",
  "reqwest",
  "serde",
  "serde_json",
@@ -4178,7 +4172,7 @@ dependencies = [
  "urlpattern",
  "webkit2gtk",
  "webview2-com",
- "window-vibrancy 0.5.2",
+ "window-vibrancy",
  "windows 0.58.0",
 ]
 
@@ -4283,7 +4277,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8b59fd750551b1066744ab956a1cd6b1ea3e1b3763b0b9153ac27a044d596426"
 dependencies = [
  "log",
- "raw-window-handle 0.6.2",
+ "raw-window-handle",
  "rfd",
  "serde",
  "serde_json",
@@ -4402,7 +4396,7 @@ dependencies = [
  "gtk",
  "http",
  "jni",
- "raw-window-handle 0.6.2",
+ "raw-window-handle",
  "serde",
  "serde_json",
  "tauri-utils",
@@ -4425,7 +4419,7 @@ dependencies = [
  "objc2-app-kit",
  "objc2-foundation",
  "percent-encoding",
- "raw-window-handle 0.6.2",
+ "raw-window-handle",
  "softbuffer",
  "tao",
  "tauri-runtime",
@@ -5244,7 +5238,7 @@ dependencies = [
  "libc",
  "objc",
  "once_cell",
- "raw-window-handle 0.6.2",
+ "raw-window-handle",
  "ringbuf",
  "samplerate",
  "serde",
@@ -5263,7 +5257,7 @@ dependencies = [
  "tokio",
  "toml 0.8.19",
  "whisper-rs",
- "window-vibrancy 0.4.3",
+ "window-vibrancy",
 ]
 
 [[package]]
@@ -5299,19 +5293,6 @@ checksum = "712e227841d057c1ee1cd2fb22fa7e5a5461ae8e48fa2ca79ec42cfc1931183f"
 
 [[package]]
 name = "window-vibrancy"
-version = "0.4.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "af6abc2b9c56bd95887825a1ce56cde49a2a97c07e28db465d541f5098a2656c"
-dependencies = [
- "cocoa 0.25.0",
- "objc",
- "raw-window-handle 0.5.2",
- "windows-sys 0.52.0",
- "windows-version",
-]
-
-[[package]]
-name = "window-vibrancy"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3ea403deff7b51fff19e261330f71608ff2cdef5721d72b64180bb95be7c4150"
@@ -5319,7 +5300,7 @@ dependencies = [
  "objc2",
  "objc2-app-kit",
  "objc2-foundation",
- "raw-window-handle 0.6.2",
+ "raw-window-handle",
  "windows-sys 0.59.0",
  "windows-version",
 ]
@@ -5737,7 +5718,7 @@ dependencies = [
  "objc2-web-kit",
  "once_cell",
  "percent-encoding",
- "raw-window-handle 0.6.2",
+ "raw-window-handle",
  "sha2",
  "soup3",
  "tao-macros",
