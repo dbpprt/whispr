@@ -8,6 +8,7 @@ use serde_json::Value;
 const BASE_PATH: &str = ".whispr";
 const SETTINGS_FILE: &str = "settings";
 
+#[derive(Clone)]
 pub struct ConfigManager<T> where T: Serialize + for<'de> Deserialize<'de> + Default {
     config_dir: PathBuf,
     _phantom: PhantomData<T>,

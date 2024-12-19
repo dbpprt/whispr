@@ -487,7 +487,7 @@ fn handle_keyboard_shortcut_selection<R: Runtime>(app: &AppHandle<R>, item: Chec
         }
     }
 
-    let current_keyboard_shortcut = whispr_config.keyboard_shortcut;
+    let current_keyboard_shortcut = whispr_config.keyboard_shortcut.clone();
     whispr_config.keyboard_shortcut = shortcut.to_string();
     if let Err(e) = config_manager.save_config(&whispr_config, "settings") {
         eprintln!("Failed to save configuration: {}", e);
@@ -498,20 +498,24 @@ fn handle_keyboard_shortcut_selection<R: Runtime>(app: &AppHandle<R>, item: Chec
         menu_item.set_checked(item_id == shortcut).unwrap();
     }
 
+    // Clone necessary parts for the closure
+    let config_manager_clone = config_manager.clone();
+    let whispr_config_clone = whispr_config.clone();
+
     // Show dialog
-    let answer = app.dialog()
+    app.dialog()
         .message("Application must be restarted for changes to take effect")
         .title("Restart Required")
         .buttons(MessageDialogButtons::OkCancel)
-        .blocking_show();
-
-    if answer {
-        println!("User clicked Ok");
-        // TODO: Close the application
-    } else {
-        whispr_config.keyboard_shortcut = current_keyboard_shortcut;
-        if let Err(e) = config_manager.save_config(&whispr_config, "settings") {
-            eprintln!("Failed to revert configuration: {}", e);
-        }
-    }
+        .show(move |answer| {
+            if answer {
+                println!("User clicked Ok");
+                // TODO: Close the application
+            } else {
+                whispr_config.keyboard_shortcut = current_keyboard_shortcut;
+                if let Err(e) = config_manager.save_config(&whispr_config, "settings") {
+                    eprintln!("Failed to revert configuration: {}", e);
+                }
+            }
+        });
 }
