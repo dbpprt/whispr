@@ -8,6 +8,13 @@ use serde_json::Value;
 const BASE_PATH: &str = ".whispr";
 const SETTINGS_FILE: &str = "settings";
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Model {
+    pub display_name: String,
+    pub url: String,
+    pub filename: String,
+}
+
 #[derive(Clone)]
 pub struct ConfigManager<T> where T: Serialize + for<'de> Deserialize<'de> + Default {
     config_dir: PathBuf,
@@ -108,6 +115,7 @@ pub struct WhisprConfig {
     pub whisper: WhisperSettings,
     pub start_at_login: bool,
     pub keyboard_shortcut: String, // New field for keyboard shortcut
+    pub models: Vec<Model>,
 }
 
 impl Default for WhisprConfig {
@@ -118,6 +126,18 @@ impl Default for WhisprConfig {
             whisper: WhisperSettings::default(),
             start_at_login: false,
             keyboard_shortcut: "right_option_key".to_string(), // Default value for keyboard shortcut
+            models: vec![
+                Model {
+                    display_name: "Whisper Large v3 Turbo".to_string(),
+                    url: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo.bin".to_string(),
+                    filename: "ggml-large-v3-turbo.bin".to_string(),
+                },
+                Model {
+                    display_name: "Whisper Large v3 Turbo Q8_0".to_string(),
+                    url: "http://example.com/model2".to_string(),
+                    filename: "ggml-large-v3-turbo-q8_0.bin".to_string(),
+                },
+            ],
         }
     }
 }
