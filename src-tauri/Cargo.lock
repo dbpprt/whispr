@@ -5250,7 +5250,7 @@ dependencies = [
  "cocoa 0.25.0",
  "core-foundation 0.10.0",
  "cpal",
- "dirs 4.0.0",
+ "dirs 5.0.1",
  "enigo",
  "fon",
  "global-hotkey 0.4.2",
