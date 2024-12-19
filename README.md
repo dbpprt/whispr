@@ -4,7 +4,7 @@
   <p><em>Your voice, your keyboard, no cloud required 🎙️</em></p>
 </div>
 
-Whispr is a macOS menubar application written in Rust for local voice-to-text transcription using [Whisper.cpp](https://github.com/ggerganov/whisper.cpp). <img src="docs/assets/menubar.png" alt="Whispr Menubar" align="right" width="300">
+Whispr is a macOS menubar application written in Rust for local voice-to-text transcription using [Whisper.cpp](https://github.com/ggerganov/whisper.cpp).
 
 ## Features
 
@@ -55,6 +55,11 @@ Whispr is highly configurable through its settings:
 2. Launch Whispr
 3. Configure settings (optional)
 4. Hold right ⌘ Command to speak
+5. Right click Whispr menubar to configure
+
+<div align="center">
+  <img src="docs/assets/menubar.png" alt="Whispr Menubar Configuration" width="300">
+</div>
 
 ## Roadmap
 

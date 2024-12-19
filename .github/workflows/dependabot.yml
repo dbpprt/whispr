@@ -1,0 +1,19 @@
+name: Dependabot
+
+on:
+  schedule:
+    - cron: '0 5 * * *' # Runs at 5 AM UTC every day
+
+jobs:
+  update-dependencies:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Dependabot Core
+        uses: dependabot/dependabot-core@v2
+        with:
+          package-ecosystem: 'npm'
+          directory: '/'
+          version: '2'
+          open-pull-requests-limit: 10
+          fetch-depth: 0
