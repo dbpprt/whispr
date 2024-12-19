@@ -1,7 +1,6 @@
 use tauri::{WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 use tauri::utils::WindowEffect;
 use tauri::utils::config::WindowEffectsConfig;
-use tauri_plugin_positioner::{Position as PositionerPosition, WindowExt};
 
 const WINDOW_TITLE: &str = "whispr:overlay";
 
@@ -27,7 +26,7 @@ impl OverlayWindow {
             WebviewUrl::App("index.html".into())
         )
         .title("whispr")
-        .inner_size(500.0, 120.0)
+        .inner_size(350.0, 85.0)
         .decorations(false)
         .transparent(true)
         .always_on_top(true)
@@ -46,9 +45,6 @@ impl OverlayWindow {
         .focused(false)
         .visible(false)
         .resizable(false)
-        //.theme(Some(tauri::Theme::Dark))
-        //.shadow(true)
-        //.title_bar_style(tauri::TitleBarStyle::Overlay)
         .build()
         .expect("Failed to create window");
 
@@ -60,13 +56,30 @@ impl OverlayWindow {
         }
     }
 
+    pub fn move_bottom_right(&self, margin: i32) -> Result<(), Box<dyn std::error::Error>> {
+        if let Some(window) = &self.window {
+            let screen = window.current_monitor()?.unwrap();
+            let screen_position = screen.position();
+            let screen_size = screen.size();
+            let window_size = window.outer_size()?;
+
+            let x = screen_position.x + (screen_size.width as i32 - window_size.width as i32 - margin);
+            let y = screen_position.y + (screen_size.height as i32 - window_size.height as i32 - margin);
+
+            window.set_position(tauri::PhysicalPosition::new(x, y))?;
+        }
+        Ok(())
+    }
+
     pub fn show(&self) {
         if let Some(window) = &self.window {
-            if let Err(e) = window.move_window(PositionerPosition::BottomRight)
-                .and_then(|_| window.set_skip_taskbar(true))
-                .and_then(|_| window.set_ignore_cursor_events(true))
-                .and_then(|_| window.show())
-            {
+            if let Err(e) = self.move_bottom_right(40) {
+                eprintln!("Failed to move window to bottom right: {}", e);
+            } else if let Err(e) = window.set_skip_taskbar(true) {
+                eprintln!("Failed to set window to skip taskbar: {}", e);
+            } else if let Err(e) = window.set_ignore_cursor_events(true) {
+                eprintln!("Failed to set window to ignore cursor events: {}", e);
+            } else if let Err(e) = window.show() {
                 eprintln!("Failed to show window: {}", e);
             } else {
                 println!("Window shown successfully");
