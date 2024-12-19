@@ -487,34 +487,33 @@ fn handle_keyboard_shortcut_selection<R: Runtime>(app: &AppHandle<R>, item: Chec
         }
     }
 
-    let current_keyboard_shortcut = whispr_config.keyboard_shortcut.clone();
-    whispr_config.keyboard_shortcut = shortcut.to_string();
-    if let Err(e) = config_manager.save_config(&whispr_config, "settings") {
-        eprintln!("Failed to save configuration: {}", e);
-    }
+    let target_shortcut = shortcut.to_string();
+    let app_handle = app.clone();
+    let current_shortcut = whispr_config.keyboard_shortcut.clone();
 
-    let menu_state = app.state::<MenuState<R>>();
-    for (item_id, menu_item) in &menu_state.keyboard_shortcut_items {
-        menu_item.set_checked(item_id == shortcut).unwrap();
-    }
-
-    // Clone necessary parts for the closure
-    let config_manager_clone = config_manager.clone();
-    let whispr_config_clone = whispr_config.clone();
-
-    // Show dialog
     app.dialog()
         .message("Application must be restarted for changes to take effect")
         .title("Restart Required")
         .buttons(MessageDialogButtons::OkCancel)
         .show(move |answer| {
             if answer {
-                println!("User clicked Ok");
-                // TODO: Close the application
+                let mut config = whispr_config.clone();
+                config.keyboard_shortcut = target_shortcut.clone();
+                
+                if let Err(e) = config_manager.save_config(&config, "settings") {
+                    eprintln!("Failed to save configuration: {}", e);
+                    return;
+                }
+
+                let menu_state = app_handle.state::<MenuState<R>>();
+                for (item_id, menu_item) in &menu_state.keyboard_shortcut_items {
+                    menu_item.set_checked(item_id.strip_prefix("keyboard_shortcut_").unwrap() == target_shortcut).unwrap();
+                }
             } else {
-                whispr_config.keyboard_shortcut = current_keyboard_shortcut;
-                if let Err(e) = config_manager.save_config(&whispr_config, "settings") {
-                    eprintln!("Failed to revert configuration: {}", e);
+                // Revert the menu item state to the previous shortcut
+                let menu_state = app_handle.state::<MenuState<R>>();
+                for (item_id, menu_item) in &menu_state.keyboard_shortcut_items {
+                    menu_item.set_checked(item_id.strip_prefix("keyboard_shortcut_").unwrap() == current_shortcut).unwrap();
                 }
             }
         });
