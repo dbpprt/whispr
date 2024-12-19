@@ -5259,7 +5259,7 @@ dependencies = [
  "tauri-plugin-shell",
  "tauri-plugin-single-instance",
  "tempfile",
- "thiserror 1.0.69",
+ "thiserror 2.0.8",
  "tokio",
  "toml 0.8.19",
  "whisper-rs",
