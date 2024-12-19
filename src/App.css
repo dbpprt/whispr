@@ -11,49 +11,77 @@ body {
   padding: 0;
   width: 100vw;
   height: 100vh;
-  background: rgba(23, 23, 23, 0.95);
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;ou.  Thank you.
+}
+
+.App {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.waveform-container {
+  position: absolute;
+  width: calc(100% - 120px);
+  height: 80px;
+  left: 60px;
+  right: 60px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-.overlay {
+.waveform {
+  width: 100%;
+  height: 100%;
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 0 16px;
+  gap: 2px;
+  padding: 0 25px;
 }
 
-.status-indicator {
-  width: 12px;
-  height: 12px;
-  background: #3584e4;
-  border-radius: 50%;
-  box-shadow: 0 0 8px rgba(53, 132, 228, 0.5);
-  animation: pulse 2s infinite;
+.bar {
+  flex: 1;
+  min-width: 2px;
+  background: rgba(255, 255, 255, 0.4);
+  transition: transform 0.15s ease-out;
+  transform-origin: center;
+  border-radius: 2px;
 }
 
-.status-text {
-  font-size: 15px;
-  font-weight: 400;
-  color: #ffffff;
-  opacity: 0.9;
-  user-select: none;
+.bar.active {
+  background: rgba(255, 255, 255, 0.8);
 }
 
-@keyframes pulse {
-  0% {
-    transform: scale(0.95);
-    box-shadow: 0 0 0 0 rgba(53, 132, 228, 0.7);
-  }
-  
-  70% {
-    transform: scale(1);
-    box-shadow: 0 0 0 4px rgba(53, 132, 228, 0);
-  }
-  
-  100% {
-    transform: scale(0.95);
-    box-shadow: 0 0 0 0 rgba(53, 132, 228, 0);
-  }
+.microphone {
+  position: absolute;
+  left: 25px;
+  top: calc(50% - 12px);
+  transform: none;
+  opacity: 0.6;
+  transition: opacity 0.3s ease;
+}
+
+.microphone svg {
+  fill: rgba(255, 255, 255, 0.4);
+  transition: fill 0.3s ease;
+}
+
+.App.active .microphone {
+  opacity: 1;
+}
+
+.App.active .microphone svg {
+  fill: rgba(255, 255, 255, 0.8);
 }

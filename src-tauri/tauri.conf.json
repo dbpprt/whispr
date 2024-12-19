@@ -11,23 +11,6 @@
   },
   "app": {
     "withGlobalTauri": true,
-    "windows": [
-      {
-        "label": "whispr:overlay",
-        "title": "Whispr",
-        "width": 300,
-        "height": 40,
-        "decorations": false,
-        "transparent": true,
-        "alwaysOnTop": true,
-        "skipTaskbar": true,
-        "focus": false,
-        "titleBarStyle": "Transparent",
-        "visible": false,
-        "center": false,
-        "url": "index.html"
-      }
-    ],
     "security": {
       "csp": null
     },
