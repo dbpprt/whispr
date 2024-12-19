@@ -13,7 +13,7 @@
     "withGlobalTauri": true,
     "windows": [
       {
-        "label": "main",
+        "label": "whispr:overlay",
         "title": "Whispr",
         "width": 300,
         "height": 40,

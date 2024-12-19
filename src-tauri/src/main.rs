@@ -102,6 +102,15 @@ fn setup_app(app: &mut App<Wry>) -> std::result::Result<(), Box<dyn std::error::
     let tray = tauri::tray::TrayIconBuilder::new()
         .icon(app_handle.default_window_icon().unwrap().clone())
         .menu(&tray_menu)
+        // .on_tray_icon_event(|icon: &tauri::tray::TrayIcon, event| { 
+        //     println!("Tray icon event received {:?}", event); 
+        //     match event { 
+        //         tauri::tray::TrayIconEvent::Click { button: tauri::tray::MouseButton::Left, button_state: tauri::tray::MouseButtonState::Up, position, .. } => { 
+        //             println!("Tray icon clicked"); 
+        //         } 
+        //         _ => {} 
+        //     } 
+        // })
         .on_menu_event(move |app, event| {
             let menu_state = handle_clone.state::<MenuState<_>>();
             crate::menu::handle_menu_event(app.clone(), &event.id().0, &menu_state);

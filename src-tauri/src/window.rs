@@ -1,6 +1,8 @@
 use tauri::{Window, Manager};
 use tauri_plugin_positioner::{WindowExt, Position as PositionerPosition};
 
+const WINDOW_TITLE: &str = "whispr:overlay";
+
 pub struct OverlayWindow {
     window: Option<Window>,
 }
@@ -20,7 +22,7 @@ impl OverlayWindow {
         println!("Creating window...");
 
         // Get the predefined window
-        if let Some(window) = app_handle.get_window("main") {
+        if let Some(window) = app_handle.get_window(WINDOW_TITLE) {
             println!("Window found successfully");
             
             // Set window to be non-interactive
@@ -29,8 +31,13 @@ impl OverlayWindow {
             }
             
             self.window = Some(window);
+            
+            if let Some(window) = &self.window {
+                let _ = window.hide();
+                let _ = window.hide_menu();
+            }
         } else {
-            eprintln!("Failed to get main window");
+            eprintln!("Failed to get {}", WINDOW_TITLE);
         }
     }
 
@@ -38,17 +45,16 @@ impl OverlayWindow {
         println!("Attempting to show window...");
         if let Some(window) = &self.window {
             // Move window to top-right position
-            if let Err(e) = window.move_window(PositionerPosition::TopRight) {
-                eprintln!("Failed to position window: {}", e);
-            }
+            // if let Err(e) = window.move_window(PositionerPosition::TopRight) {
+            //     eprintln!("Failed to position window: {}", e);
+            // }
 
-            // Set window to skip taskbar
             if let Err(e) = window.set_skip_taskbar(true) {
                 eprintln!("Failed to set skip taskbar: {}", e);
             }
 
             if let Err(e) = window.set_ignore_cursor_events(true) {
-                eprintln!("Failed to set skip taskbar: {}", e);
+                eprintln!("Failed to set ignore cursor events: {}", e);
             }
 
             // Show window
@@ -56,6 +62,10 @@ impl OverlayWindow {
                 eprintln!("Failed to show window: {}", e);
             } else {
                 println!("Window shown successfully");
+                
+                if let Err(e) = window.hide_menu() {
+                    eprintln!("Failed to hide window menu: {}", e);
+                }
 
                 // Ensure window is on top
                 if let Err(e) = window.set_always_on_top(true) {
@@ -74,6 +84,10 @@ impl OverlayWindow {
                 eprintln!("Failed to hide window: {}", e);
             } else {
                 println!("Window hidden successfully");
+
+                if let Err(e) = window.hide_menu() {
+                    eprintln!("Failed to hide window menu: {}", e);
+                }
             }
         }
     }

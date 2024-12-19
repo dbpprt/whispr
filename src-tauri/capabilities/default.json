@@ -3,7 +3,7 @@
   "identifier": "default",
   "description": "Default capabilities for whispr",
   "windows": [
-    "main"
+    "whispr:overlay"
   ],
   "permissions": [
     "core:default",
