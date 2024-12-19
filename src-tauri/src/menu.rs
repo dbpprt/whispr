@@ -93,6 +93,9 @@ pub fn handle_menu_event<R: Runtime>(app: AppHandle<R>, id: &str, menu_state: &M
                 handle_keyboard_shortcut_selection(&app, item.clone(), shortcut);
             }
         }
+        "restart" => {
+            app.restart();
+        }
         _ => {
             eprintln!("Warning: Unhandled menu item: {:?}", id);
         }
@@ -170,11 +173,17 @@ pub fn create_tray_menu<R: Runtime>(app: &AppHandle<R>) -> (Menu<R>, MenuState<R
         None::<String>
     ).unwrap();
 
+    let restart = MenuItem::with_id(app, "restart", "Restart".to_string(), true, None::<String>).unwrap();
+
     let developer_options_submenu = Submenu::with_items(
         app,
         "Developer Options",
         true,
-        &[&save_recordings_item as &dyn tauri::menu::IsMenuItem<R>, &whisper_logging_item as &dyn tauri::menu::IsMenuItem<R>] // Include Whisper logging item
+        &[
+            &save_recordings_item as &dyn tauri::menu::IsMenuItem<R>,
+            &whisper_logging_item as &dyn tauri::menu::IsMenuItem<R>,
+            &restart as &dyn tauri::menu::IsMenuItem<R>
+        ]
     ).unwrap();
 
     let language_items = vec![

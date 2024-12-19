@@ -136,7 +136,7 @@ impl Default for AudioSettings {
         Self {
             device_name: None,
             remove_silence: true,
-            silence_threshold: 0.40,
+            silence_threshold: 0.90,
             min_silence_duration: 250,
             recordings_dir: Some(BASE_PATH.to_string()),
         }
