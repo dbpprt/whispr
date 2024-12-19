@@ -89,7 +89,7 @@ fn setup_app(app: &mut App<Wry>) -> std::result::Result<(), Box<dyn std::error::
     state.configure_audio(&whispr_config)?;
     
     // Create window
-    state.overlay.lock().unwrap().create_window(&app_handle);
+    // state.overlay.lock().unwrap().create_window(&app_handle);
     
     // Store state
     app.manage(state);
