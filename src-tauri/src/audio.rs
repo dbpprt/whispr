@@ -178,19 +178,40 @@ impl AudioManager {
     }
 
     pub fn stop_capture(&mut self) {
-        self.stream = None;
+        // First mark as not capturing to prevent any new data from being processed
         *self.is_capturing.lock().unwrap() = false;
+
+        // Ensure proper stream shutdown
+        if let Some(stream) = self.stream.take() {
+            // Pause the stream before dropping to ensure clean shutdown
+            if let Err(e) = stream.pause() {
+                eprintln!("Error pausing stream: {}", e);
+            }
+            drop(stream);
+        }
         
+        // Clean up WAV writer
         if let Some(writer) = self.wav_writer.lock().unwrap().take() {
             if let Err(e) = writer.finalize() {
                 eprintln!("Error finalizing WAV file: {}", e);
             }
         }
 
+        // Log timing information
         if let Some(start_time) = self._start_time.lock().unwrap().take() {
             let duration = start_time.elapsed();
             println!("Recording stopped after: {:.2}s", duration.as_secs_f32());
         }
+        
+        // Small delay to ensure all audio data has been processed
+        std::thread::sleep(std::time::Duration::from_millis(50));
+
+        // Log audio buffer size but don't clear it yet - it will be cleared when get_captured_audio is called
+        let samples = self.captured_audio.lock().unwrap().len();
+        println!("Audio buffer contains {} samples", samples);
+
+        // Additional delay to ensure complete cleanup
+        std::thread::sleep(std::time::Duration::from_millis(50));
     }
 
     fn build_input_stream_f32(
@@ -202,7 +223,10 @@ impl AudioManager {
         _start_time: Arc<Mutex<Option<Instant>>>,
         captured_audio: Arc<Mutex<VecDeque<f32>>>,
     ) -> Result<Stream, Error> {
-        let mut silence_counter = 0;
+        // Clear any existing audio data before starting new capture
+        captured_audio.lock().unwrap().clear();
+
+        let mut silence_counter = 0usize;
         let mut is_in_silence = false;
 
         let input_data_fn = move |data: &[f32], _: &cpal::InputCallbackInfo| {
@@ -210,39 +234,54 @@ impl AudioManager {
                 return;
             }
 
-            let config = silence_config.lock().unwrap();
+            // Get all silence config values in one lock
+            let silence_cfg = {
+                let cfg = silence_config.lock().unwrap();
+                (cfg.enabled, cfg.threshold, cfg.min_silence_duration)
+            };
+            let (is_silence_enabled, silence_threshold, min_silence_duration) = silence_cfg;
+
+            // Process samples without holding locks
+            let mut samples_to_keep = Vec::with_capacity(data.len());
             
-            if let Some(ref mut writer) = *wav_writer.lock().unwrap() {
-                if config.enabled {
-                    for &sample in data {
-                        let amplitude = sample.abs();
-                        
-                        if amplitude > config.threshold {
-                            if is_in_silence {
-                                is_in_silence = false;
-                                silence_counter = 0;
-                            }
-                            writer.write_sample(sample).unwrap_or_else(|e| eprintln!("Error writing sample: {}", e));
-                            captured_audio.lock().unwrap().push_back(sample);
+            if is_silence_enabled {
+                for &sample in data {
+                    let amplitude = sample.abs();
+                    if amplitude > silence_threshold {
+                        if is_in_silence {
+                            silence_counter = 0;
+                            is_in_silence = false;
+                        }
+                        samples_to_keep.push(sample);
+                    } else if !is_in_silence {
+                        silence_counter += 1;
+                        if silence_counter >= min_silence_duration {
+                            is_in_silence = true;
                         } else {
-                            if !is_in_silence {
-                                silence_counter += 1;
-                                if silence_counter >= config.min_silence_duration {
-                                    is_in_silence = true;
-                                } else {
-                                    writer.write_sample(sample).unwrap_or_else(|e| eprintln!("Error writing sample: {}", e));
-                                    captured_audio.lock().unwrap().push_back(sample);
-                                }
-                            }
+                            samples_to_keep.push(sample);
                         }
                     }
-                } else {
-                    for &sample in data {
+                }
+            } else {
+                samples_to_keep.extend_from_slice(data);
+            }
+
+            // Write samples in a single batch with minimal lock time
+            {
+                let mut writer_guard = wav_writer.lock().unwrap();
+                if let Some(ref mut writer) = *writer_guard {
+                    // Write all samples at once to minimize lock time
+                    for &sample in &samples_to_keep {
                         writer.write_sample(sample).unwrap_or_else(|e| eprintln!("Error writing sample: {}", e));
-                        captured_audio.lock().unwrap().push_back(sample);
                     }
                 }
-            }
+            } // writer lock is released here
+
+            // Update audio buffer in a single batch with minimal lock time
+            {
+                let mut audio_buffer = captured_audio.lock().unwrap();
+                audio_buffer.extend(samples_to_keep);
+            } // audio buffer lock is released here
         };
 
         let stream = self.input_device.build_input_stream(
@@ -262,18 +301,33 @@ impl AudioManager {
     pub fn get_captured_audio(&self, desired_sample_rate: u32, desired_channels: u16) -> Option<Vec<f32>> {
         let mut audio_buffer = self.captured_audio.lock().unwrap();
         if audio_buffer.is_empty() {
+            println!("Audio buffer is empty");
             None
         } else {
+            let buffer_len = audio_buffer.len();
+            println!("Processing {} samples from audio buffer", buffer_len);
+            
             let audio_data: Vec<f32> = Vec::from_iter(audio_buffer.drain(..));
-            let config = self.input_device.default_input_config().ok()?;
+            let config = match self.input_device.default_input_config() {
+                Ok(cfg) => cfg,
+                Err(e) => {
+                    eprintln!("Failed to get input config: {}", e);
+                    return None;
+                }
+            };
+            
             let captured_sample_rate = config.sample_rate().0;
             let captured_channels = config.channels();
+            println!("Captured format: {}Hz, {} channels", captured_sample_rate, captured_channels);
+            println!("Desired format: {}Hz, {} channels", desired_sample_rate, desired_channels);
 
             let mut processed_audio = audio_data;
+            let initial_len = processed_audio.len();
 
             // Only convert stereo to mono if we have stereo input and want mono output
             if captured_channels == 2 && desired_channels == 1 {
                 processed_audio = stereo_to_mono(&processed_audio);
+                println!("Converted stereo to mono: {} -> {} samples", initial_len, processed_audio.len());
             } else if captured_channels > 2 {
                 // Handle other multi-channel formats (if any) by averaging all channels
                 let samples_per_frame = captured_channels as usize;
@@ -283,20 +337,28 @@ impl AudioManager {
                     mono_data.push(average);
                 }
                 processed_audio = mono_data;
+                println!("Converted multi-channel to mono: {} -> {} samples", initial_len, processed_audio.len());
             }
-            // Note: If input is already mono, no channel conversion needed
 
             // Resample if needed
             if captured_sample_rate != desired_sample_rate {
+                let before_resample = processed_audio.len();
                 processed_audio = audio_resample(
                     &processed_audio,
                     captured_sample_rate,
                     desired_sample_rate,
                     desired_channels,
                 );
+                println!("Resampled audio: {} -> {} samples", before_resample, processed_audio.len());
             }
 
-            Some(processed_audio)
+            if processed_audio.is_empty() {
+                println!("Warning: Processed audio is empty after conversion");
+                None
+            } else {
+                println!("Successfully processed {} samples", processed_audio.len());
+                Some(processed_audio)
+            }
         }
     }
 }

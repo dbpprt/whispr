@@ -8,9 +8,11 @@ mod config;
 mod menu;
 mod whisper;
 
+use std::sync::{Arc, Mutex};
 use tauri::{Manager, App, Wry, Emitter};
-use std::sync::Mutex;
 use std::path::Path;
+use std::time::{Duration, Instant};
+use tokio::sync::Semaphore;
 use enigo::{Enigo, Keyboard, Settings};
 use crate::{
     audio::AudioManager,
@@ -20,6 +22,8 @@ use crate::{
     menu::{create_tray_menu, MenuState},
     whisper::WhisperProcessor,
 };
+
+const MIN_RECORDING_DURATION: Duration = Duration::from_secs(1);
 
 #[derive(thiserror::Error, Debug)]
 pub enum WhisprError {
@@ -41,6 +45,8 @@ struct AppState {
     whisper: WhisperProcessor,
     audio: Mutex<AudioManager>,
     overlay: Mutex<OverlayWindow>,
+    recording_semaphore: Arc<Semaphore>,
+    recording_start: Mutex<Option<Instant>>,
 }
 
 impl AppState {
@@ -56,6 +62,8 @@ impl AppState {
             whisper,
             audio: Mutex::new(audio_manager),
             overlay: Mutex::new(OverlayWindow::new()),
+            recording_semaphore: Arc::new(Semaphore::new(1)),
+            recording_start: Mutex::new(None),
         })
     }
 
@@ -117,43 +125,93 @@ fn setup_app(app: &mut App<Wry>) -> std::result::Result<(), Box<dyn std::error::
     let mut hotkey_manager = HotkeyManager::new(move |is_speaking| {
         if let Some(state) = app_handle_clone.try_state::<AppState>() {
             let overlay = state.overlay.lock().unwrap();
+            
             if is_speaking {
-                overlay.show();
-            } else {
-                overlay.hide();
-            }
-
-            let mut audio = state.audio.lock().unwrap();
-            if is_speaking {
-                if let Err(e) = audio.start_capture() {
-                    eprintln!("Failed to start audio capture: {}", e);
-                    return;
+                // Try to acquire the semaphore permit
+                if let Ok(_permit) = state.recording_semaphore.try_acquire() {
+                    overlay.show();
+                    let mut audio = state.audio.lock().unwrap();
+                    if let Err(e) = audio.start_capture() {
+                        eprintln!("Failed to start audio capture: {}", e);
+                        return;
+                    }
+                    *state.recording_start.lock().unwrap() = Some(Instant::now());
+                    let _ = app_handle_clone.emit("status-change", "Listening");
+                } else {
+                    eprintln!("Recording already in progress");
                 }
-                let _ = app_handle_clone.emit("status-change", "Listening");
             } else {
+                let mut audio = state.audio.lock().unwrap();
                 audio.stop_capture();
+                
+                // Check recording duration
+                if let Some(start_time) = state.recording_start.lock().unwrap().take() {
+                    let duration = start_time.elapsed();
+                    if duration < MIN_RECORDING_DURATION {
+                        println!("Recording too short ({:.2}s), discarding", duration.as_secs_f32());
+                        let _ = app_handle_clone.emit("status-change", "Ready");
+                        overlay.hide();
+                        return;
+                    }
+                }
+                
                 let _ = app_handle_clone.emit("status-change", "Transcribing");
                 
                 if let Some(captured_audio) = audio.get_captured_audio(16000, 1) {
-                    if let Ok(segments) = state.whisper.process_audio(captured_audio) {
-                        let transcription: String = segments.iter().map(|(_, _, segment)| segment.clone()).collect::<Vec<String>>().join(" ");
-                        println!("{}", transcription);
-
-                        let mut enigo = match Enigo::new(&Settings::default()) {
-                            Ok(enigo) => enigo,
-                            Err(e) => {
-                                eprintln!("Failed to create Enigo instance: {}", e);
+                    println!("Got captured audio: {} samples", captured_audio.len());
+                    
+                    match state.whisper.process_audio(captured_audio) {
+                        Ok(segments) => {
+                            if segments.is_empty() {
+                                println!("No transcription segments produced");
+                                let _ = app_handle_clone.emit("status-change", "Ready");
+                                overlay.hide();
                                 return;
                             }
-                        };
-                        if let Err(e) = enigo.text(&transcription) {
-                            eprintln!("Failed to send text: {}", e);
+                            
+                            let transcription: String = segments.iter()
+                                .map(|(_, _, segment)| segment.clone())
+                                .collect::<Vec<String>>()
+                                .join(" ");
+                            println!("Transcription: {}", transcription);
+
+                            let mut enigo = match Enigo::new(&Settings::default()) {
+                                Ok(enigo) => enigo,
+                                Err(e) => {
+                                    eprintln!("Failed to create Enigo instance: {}", e);
+                                    let _ = app_handle_clone.emit("status-change", "Ready");
+                                    overlay.hide();
+                                    return;
+                                }
+                            };
+                            
+                            if let Err(e) = enigo.text(&transcription) {
+                                eprintln!("Failed to send text: {}", e);
+                                let _ = app_handle_clone.emit("status-change", "Ready");
+                                overlay.hide();
+                                return;
+                            }
+                            
+                            let _ = app_handle_clone.emit("status-change", "Ready");
+                        }
+                        Err(e) => {
+                            eprintln!("Failed to process audio: {}", e);
+                            let _ = app_handle_clone.emit("status-change", "Ready");
+                            overlay.hide();
                             return;
                         }
-                    } else {
-                        eprintln!("Failed to process audio");
                     }
+                } else {
+                    println!("No audio captured");
+                    let _ = app_handle_clone.emit("status-change", "Ready");
+                    overlay.hide();
+                    return;
                 }
+                
+                overlay.hide();
+                
+                // Release the semaphore permit
+                state.recording_semaphore.add_permits(1);
             }
         }
     }, whispr_config.clone());
