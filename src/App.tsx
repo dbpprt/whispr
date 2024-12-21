@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { listen } from '@tauri-apps/api/event';
+import icon from './icon.png';
 
 function App() {
   const [isActive, setIsActive] = useState(false);
@@ -55,7 +56,7 @@ function App() {
 
   return (
     <div className={`App ${isActive ? 'active' : ''}`}>
-      <img src="icon/icon.png" className="tauri-icon" alt="Tauri logo" />
+      <img src={icon} className="tauri-icon" alt="Tauri logo" />
       <div className="waveform-container">
         <div className="waveform">
           {heights.map((height, i) => (
