@@ -2,3 +2,17 @@ Important Rules:
 - Do not write code in the chat (e.g. "Here's the corrected version ..."), only using tools.
 - Important: we use tauri v2 not v1, there are many breaking changes!
 - Do not write doc strings or unnecessary comments. Only comment really complex parts of the code.
+
+Git Commit Message Rules:
+- All commit messages must follow the conventional commit format
+- Start with one of these types followed by a colon and space:
+  * feat: New features or significant additions
+  * fix: Bug fixes or error corrections
+  * chore: Routine tasks, maintenance, or tooling changes
+- After the type, write a concise description in present tense
+- Keep the first line under 72 characters
+- Use imperative mood ("add" not "adds" or "added")
+- Examples:
+  * feat: add global hotkey support
+  * fix: resolve memory leak in audio capture
+  * chore: update dependencies to latest versions
