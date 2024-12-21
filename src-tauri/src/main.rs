@@ -265,7 +265,6 @@ fn main() {
             println!("{}, {argv:?}, {cwd}", app.package_info().name);
         }))
         .plugin(tauri_plugin_shell::init())
-        .plugin(tauri_plugin_positioner::init())
         .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, None))
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_process::init())  // Register the process plugin

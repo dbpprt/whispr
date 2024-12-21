@@ -13,9 +13,7 @@
     "core:tray:allow-new",
     "core:tray:allow-set-icon",
     "core:tray:allow-set-menu",
-    "global-shortcut:default",
     "shell:allow-open",
-    "shell:default",
-    "positioner:default"
+    "shell:default"
   ]
 }
