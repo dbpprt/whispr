@@ -55,7 +55,7 @@ function App() {
 
   return (
     <div className={`App ${isActive ? 'active' : ''}`}>
-      <img src="/src/icon.png" className="tauri-icon" alt="Tauri logo" />
+      <img src="icon/icon.png" className="tauri-icon" alt="Tauri logo" />
       <div className="waveform-container">
         <div className="waveform">
           {heights.map((height, i) => (

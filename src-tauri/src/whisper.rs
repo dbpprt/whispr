@@ -1,5 +1,6 @@
 use whisper_rs::{WhisperContext, WhisperContextParameters, FullParams, SamplingStrategy};
 use crate::config::WhisprConfig;
+use log::info;
 use std::sync::Arc;
 use std::result::Result;
 
@@ -56,7 +57,7 @@ impl WhisperProcessor {
             let end = state.full_get_segment_t1(i)
                 .map_err(|e| e.to_string())? as f32;
 
-            println!("[{} - {}]: {}", start, end, segment);
+            info!("[{} - {}]: {}", start, end, segment);
             segments.push((start, end, segment));
         }
         Ok(segments)

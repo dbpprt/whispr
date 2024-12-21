@@ -1,4 +1,5 @@
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
+use log::{error, warn, info, debug};
 use cpal::{Device, Host, Stream, StreamConfig};
 use hound::{WavWriter, WavSpec};
 use std::sync::{Arc, Mutex};
@@ -68,7 +69,7 @@ impl AudioManager {
             .default_input_device()
             .ok_or_else(|| anyhow::anyhow!("No input device available"))?;
         
-        println!("Using input device: {}", input_device.name()?);
+        info!("Using input device: {}", input_device.name()?);
 
         Ok(Self {
             host,
@@ -127,14 +128,14 @@ impl AudioManager {
 
     pub fn start_capture(&mut self) -> Result<(), Error> {
         let default_config = self.input_device.default_input_config()?;
-        println!("Default input config: {:?}", default_config);
+        debug!("Default input config: {:?}", default_config);
 
         let config = StreamConfig {
             channels: default_config.channels(),
             sample_rate: default_config.sample_rate(),
             buffer_size: cpal::BufferSize::Default,
         };
-        println!("Using input config: {:?}", config);
+        debug!("Using input config: {:?}", config);
 
         let spec = WavSpec {
             channels: config.channels,
@@ -151,7 +152,7 @@ impl AudioManager {
             let recordings_dir = config_manager.get_config_dir().join("recordings");
             let file_path = recordings_dir.join(format!("{}.wav", timestamp));
             std::fs::create_dir_all(&recordings_dir).expect("Failed to create recordings directory");
-            println!("Saving recording to: {}", file_path.display());
+            info!("Saving recording to: {}", file_path.display());
             Some(WavWriter::create(file_path, spec)?)
         } else {
             None
@@ -172,7 +173,7 @@ impl AudioManager {
         self.stream = Some(stream);
         *self.is_capturing.lock().unwrap() = true;
 
-        println!("Capture started");
+        info!("Capture started");
 
         Ok(())
     }
@@ -185,7 +186,7 @@ impl AudioManager {
         if let Some(stream) = self.stream.take() {
             // Pause the stream before dropping to ensure clean shutdown
             if let Err(e) = stream.pause() {
-                eprintln!("Error pausing stream: {}", e);
+                error!("Error pausing stream: {}", e);
             }
             drop(stream);
         }
@@ -193,14 +194,14 @@ impl AudioManager {
         // Clean up WAV writer
         if let Some(writer) = self.wav_writer.lock().unwrap().take() {
             if let Err(e) = writer.finalize() {
-                eprintln!("Error finalizing WAV file: {}", e);
+                error!("Error finalizing WAV file: {}", e);
             }
         }
 
         // Log timing information
         if let Some(start_time) = self._start_time.lock().unwrap().take() {
             let duration = start_time.elapsed();
-            println!("Recording stopped after: {:.2}s", duration.as_secs_f32());
+            info!("Recording stopped after: {:.2}s", duration.as_secs_f32());
         }
         
         // Small delay to ensure all audio data has been processed
@@ -208,7 +209,7 @@ impl AudioManager {
 
         // Log audio buffer size but don't clear it yet - it will be cleared when get_captured_audio is called
         let samples = self.captured_audio.lock().unwrap().len();
-        println!("Audio buffer contains {} samples", samples);
+        debug!("Audio buffer contains {} samples", samples);
 
         // Additional delay to ensure complete cleanup
         std::thread::sleep(std::time::Duration::from_millis(50));
@@ -272,7 +273,7 @@ impl AudioManager {
                 if let Some(ref mut writer) = *writer_guard {
                     // Write all samples at once to minimize lock time
                     for &sample in &samples_to_keep {
-                        writer.write_sample(sample).unwrap_or_else(|e| eprintln!("Error writing sample: {}", e));
+                        writer.write_sample(sample).unwrap_or_else(|e| error!("Error writing sample: {}", e));
                     }
                 }
             } // writer lock is released here
@@ -287,7 +288,7 @@ impl AudioManager {
         let stream = self.input_device.build_input_stream(
             config,
             input_data_fn,
-            move |err| eprintln!("An error occurred on the audio stream: {}", err),
+            move |err| error!("An error occurred on the audio stream: {}", err),
             None,
         )?;
 
@@ -301,25 +302,25 @@ impl AudioManager {
     pub fn get_captured_audio(&self, desired_sample_rate: u32, desired_channels: u16) -> Option<Vec<f32>> {
         let mut audio_buffer = self.captured_audio.lock().unwrap();
         if audio_buffer.is_empty() {
-            println!("Audio buffer is empty");
+            debug!("Audio buffer is empty");
             None
         } else {
             let buffer_len = audio_buffer.len();
-            println!("Processing {} samples from audio buffer", buffer_len);
+            debug!("Processing {} samples from audio buffer", buffer_len);
             
             let audio_data: Vec<f32> = Vec::from_iter(audio_buffer.drain(..));
             let config = match self.input_device.default_input_config() {
                 Ok(cfg) => cfg,
                 Err(e) => {
-                    eprintln!("Failed to get input config: {}", e);
+                    error!("Failed to get input config: {}", e);
                     return None;
                 }
             };
             
             let captured_sample_rate = config.sample_rate().0;
             let captured_channels = config.channels();
-            println!("Captured format: {}Hz, {} channels", captured_sample_rate, captured_channels);
-            println!("Desired format: {}Hz, {} channels", desired_sample_rate, desired_channels);
+            debug!("Captured format: {}Hz, {} channels", captured_sample_rate, captured_channels);
+            debug!("Desired format: {}Hz, {} channels", desired_sample_rate, desired_channels);
 
             let mut processed_audio = audio_data;
             let initial_len = processed_audio.len();
@@ -327,7 +328,7 @@ impl AudioManager {
             // Only convert stereo to mono if we have stereo input and want mono output
             if captured_channels == 2 && desired_channels == 1 {
                 processed_audio = stereo_to_mono(&processed_audio);
-                println!("Converted stereo to mono: {} -> {} samples", initial_len, processed_audio.len());
+                debug!("Converted stereo to mono: {} -> {} samples", initial_len, processed_audio.len());
             } else if captured_channels > 2 {
                 // Handle other multi-channel formats (if any) by averaging all channels
                 let samples_per_frame = captured_channels as usize;
@@ -337,7 +338,7 @@ impl AudioManager {
                     mono_data.push(average);
                 }
                 processed_audio = mono_data;
-                println!("Converted multi-channel to mono: {} -> {} samples", initial_len, processed_audio.len());
+                debug!("Converted multi-channel to mono: {} -> {} samples", initial_len, processed_audio.len());
             }
 
             // Resample if needed
@@ -349,14 +350,14 @@ impl AudioManager {
                     desired_sample_rate,
                     desired_channels,
                 );
-                println!("Resampled audio: {} -> {} samples", before_resample, processed_audio.len());
+                debug!("Resampled audio: {} -> {} samples", before_resample, processed_audio.len());
             }
 
             if processed_audio.is_empty() {
-                println!("Warning: Processed audio is empty after conversion");
+                warn!("Processed audio is empty after conversion");
                 None
             } else {
-                println!("Successfully processed {} samples", processed_audio.len());
+                debug!("Successfully processed {} samples", processed_audio.len());
                 Some(processed_audio)
             }
         }

@@ -17,10 +17,12 @@
     "macOSPrivateApi": true
   },
   "bundle": {
+    "macOS": {
+      "entitlements": "./Entitlements.plist"
+    },
     "active": true,
     "targets": [
-      "dmg",
-      "app"
+      "dmg"
     ], 
     "icon": [
       "icons/32x32.png",

@@ -7,7 +7,9 @@ mod audio;
 mod config;
 mod menu;
 mod whisper;
+mod logging;
 
+use log::{error, warn, info, debug};
 use std::sync::{Arc, Mutex};
 use tauri::{Manager, App, Wry, Emitter};
 use std::time::{Duration, Instant};
@@ -167,13 +169,13 @@ fn setup_app(app: &mut App<Wry>) -> std::result::Result<(), Box<dyn std::error::
                     overlay.show();
                     let mut audio = state.audio.lock().unwrap();
                     if let Err(e) = audio.start_capture() {
-                        eprintln!("Failed to start audio capture: {}", e);
+                        error!("Failed to start audio capture: {}", e);
                         return;
                     }
                     *state.recording_start.lock().unwrap() = Some(Instant::now());
                     let _ = app_handle_clone.emit("status-change", "Listening");
                 } else {
-                    eprintln!("Recording already in progress");
+                    warn!("Recording already in progress");
                 }
             } else {
                 let mut audio = state.audio.lock().unwrap();
@@ -183,7 +185,7 @@ fn setup_app(app: &mut App<Wry>) -> std::result::Result<(), Box<dyn std::error::
                 if let Some(start_time) = state.recording_start.lock().unwrap().take() {
                     let duration = start_time.elapsed();
                     if duration < MIN_RECORDING_DURATION {
-                        println!("Recording too short ({:.2}s), discarding", duration.as_secs_f32());
+                        debug!("Recording too short ({:.2}s), discarding", duration.as_secs_f32());
                         let _ = app_handle_clone.emit("status-change", "Ready");
                         overlay.hide();
                         return;
@@ -193,12 +195,12 @@ fn setup_app(app: &mut App<Wry>) -> std::result::Result<(), Box<dyn std::error::
                 let _ = app_handle_clone.emit("status-change", "Transcribing");
                 
                 if let Some(captured_audio) = audio.get_captured_audio(16000, 1) {
-                    println!("Got captured audio: {} samples", captured_audio.len());
+                    debug!("Got captured audio: {} samples", captured_audio.len());
                     
                     match state.whisper.process_audio(captured_audio) {
                         Ok(segments) => {
                             if segments.is_empty() {
-                                println!("No transcription segments produced");
+                                info!("No transcription segments produced");
                                 let _ = app_handle_clone.emit("status-change", "Ready");
                                 overlay.hide();
                                 return;
@@ -208,12 +210,12 @@ fn setup_app(app: &mut App<Wry>) -> std::result::Result<(), Box<dyn std::error::
                                 .map(|(_, _, segment)| segment.clone())
                                 .collect::<Vec<String>>()
                                 .join(" ");
-                            println!("Transcription: {}", transcription);
+                            info!("Transcription: {}", transcription);
 
                             let mut enigo = match Enigo::new(&Settings::default()) {
                                 Ok(enigo) => enigo,
                                 Err(e) => {
-                                    eprintln!("Failed to create Enigo instance: {}", e);
+                                    error!("Failed to create Enigo instance: {}", e);
                                     let _ = app_handle_clone.emit("status-change", "Ready");
                                     overlay.hide();
                                     return;
@@ -221,7 +223,7 @@ fn setup_app(app: &mut App<Wry>) -> std::result::Result<(), Box<dyn std::error::
                             };
                             
                             if let Err(e) = enigo.text(&transcription) {
-                                eprintln!("Failed to send text: {}", e);
+                                error!("Failed to send text: {}", e);
                                 let _ = app_handle_clone.emit("status-change", "Ready");
                                 overlay.hide();
                                 return;
@@ -230,14 +232,14 @@ fn setup_app(app: &mut App<Wry>) -> std::result::Result<(), Box<dyn std::error::
                             let _ = app_handle_clone.emit("status-change", "Ready");
                         }
                         Err(e) => {
-                            eprintln!("Failed to process audio: {}", e);
+                            error!("Failed to process audio: {}", e);
                             let _ = app_handle_clone.emit("status-change", "Ready");
                             overlay.hide();
                             return;
                         }
                     }
                 } else {
-                    println!("No audio captured");
+                    info!("No audio captured");
                     let _ = app_handle_clone.emit("status-change", "Ready");
                     overlay.hide();
                     return;
@@ -252,7 +254,7 @@ fn setup_app(app: &mut App<Wry>) -> std::result::Result<(), Box<dyn std::error::
     }, whispr_config.clone());
 
     if let Err(e) = hotkey_manager.start() {
-        eprintln!("Failed to start hotkey manager: {}", e);
+        error!("Failed to start hotkey manager: {}", e);
     }
 
     Ok(())
@@ -260,9 +262,15 @@ fn setup_app(app: &mut App<Wry>) -> std::result::Result<(), Box<dyn std::error::
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 fn main() {
+    if let Err(e) = logging::setup_logging() {
+        eprintln!("Failed to initialize logging: {}", e);
+    }
+    
+    info!("Starting Whispr application");
+    
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, argv, cwd| {
-            println!("{}, {argv:?}, {cwd}", app.package_info().name);
+            info!("{}, {argv:?}, {cwd}", app.package_info().name);
         }))
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, None))

@@ -1,4 +1,5 @@
 use anyhow::Result;
+use log::info;
 use serde::{Serialize, Deserialize};
 use std::path::{Path, PathBuf};
 use std::fs;
@@ -60,7 +61,7 @@ impl<T> ConfigManager<T> where T: Serialize + for<'de> Deserialize<'de> + Defaul
         let (merged_value, had_missing_fields) = merge_json_values(stored_config, default_value);
         
         if had_missing_fields {
-            println!("Config file had missing fields, updating with default values");
+            info!("Config file had missing fields, updating with default values");
             let config: T = serde_json::from_value(merged_value.clone())?;
             self.save_config(&config, _name)?;
         }
@@ -86,7 +87,7 @@ fn merge_json_values(stored: Value, default: Value) -> (Value, bool) {
             for (key, default_value) in default_map {
                 match stored_map.get(&key) {
                     None => {
-                        println!("Missing config field: {}", key);
+                        info!("Missing config field: {}", key);
                         had_missing_fields = true;
                         stored_map.insert(key, default_value);
                     }
@@ -159,14 +160,16 @@ impl Default for AudioSettings {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct DeveloperSettings {
     pub save_recordings: bool,
-    pub whisper_logging: bool, // New field for Whisper logging
+    pub whisper_logging: bool,
+    pub logging: bool,
 }
 
 impl Default for DeveloperSettings {
     fn default() -> Self {
         Self {
             save_recordings: false,
-            whisper_logging: false, // Default value for Whisper logging
+            whisper_logging: false,
+            logging: true, // Logging enabled by default
         }
     }
 }

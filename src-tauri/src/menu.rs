@@ -2,6 +2,7 @@ use tauri::{
     AppHandle, Manager, Runtime,
     menu::{Menu, MenuItem, Submenu, CheckMenuItem, PredefinedMenuItem},
 };
+use log::{error, info, debug, warn};
 use std::collections::HashMap;
 use crate::audio::AudioManager;
 use crate::config::{ConfigManager, WhisprConfig};
@@ -17,14 +18,15 @@ pub struct MenuState<R: Runtime> {
     pub language_items: HashMap<String, CheckMenuItem<R>>,
     pub translate_item: Option<CheckMenuItem<R>>,
     pub start_at_login_item: Option<CheckMenuItem<R>>,
-    pub whisper_logging_item: Option<CheckMenuItem<R>>, // New field for Whisper logging
-    pub keyboard_shortcut_items: HashMap<String, CheckMenuItem<R>>, // New field for Keyboard Shortcut items
+    pub whisper_logging_item: Option<CheckMenuItem<R>>,
+    pub logging_item: Option<CheckMenuItem<R>>,
+    pub keyboard_shortcut_items: HashMap<String, CheckMenuItem<R>>,
 }
 
 pub fn handle_menu_event<R: Runtime>(app: AppHandle<R>, id: &str, menu_state: &MenuState<R>) {
     match id {
         "quit" => {
-            println!("Quit menu item selected");
+            info!("Quit menu item selected");
             app.exit(0);
         }
         "remove_silence" => {
@@ -36,7 +38,7 @@ pub fn handle_menu_event<R: Runtime>(app: AppHandle<R>, id: &str, menu_state: &M
             if let Some(device_id) = id.strip_prefix("audio_device_") {
                 handle_audio_device_selection(&app, device_id, &menu_state.audio_device_map);
             } else {
-                eprintln!("Warning: Invalid audio device ID format: {:?}", id);
+                error!("Invalid audio device ID format: {:?}", id);
             }
         }
         "save_recordings" => {
@@ -58,7 +60,7 @@ pub fn handle_menu_event<R: Runtime>(app: AppHandle<R>, id: &str, menu_state: &M
                     "French" => "fr",
                     "Spanish" => "es",
                     _ => {
-                        eprintln!("Error: Unknown language selected: {}", id);
+                        error!("Unknown language selected: {}", id);
                         return;
                     }
                 };
@@ -75,7 +77,7 @@ pub fn handle_menu_event<R: Runtime>(app: AppHandle<R>, id: &str, menu_state: &M
                 handle_start_at_login_selection(&app, start_at_login_item);
             }
         }
-        "whisper_logging" => { // New event handler for Whisper logging
+        "whisper_logging" => {
             if let Some(whisper_logging_item) = &menu_state.whisper_logging_item {
                 handle_whisper_logging_selection(&app, whisper_logging_item);
             }
@@ -86,18 +88,23 @@ pub fn handle_menu_event<R: Runtime>(app: AppHandle<R>, id: &str, menu_state: &M
                     "right_option_key" => "right_option_key",
                     "right_command_key" => "right_command_key",
                     _ => {
-                        eprintln!("Error: Unknown keyboard shortcut selected: {}", id);
+                        error!("Unknown keyboard shortcut selected: {}", id);
                         return;
                     }
                 };
                 handle_keyboard_shortcut_selection(&app, item.clone(), shortcut);
             }
         }
+        "logging" => {
+            if let Some(logging_item) = &menu_state.logging_item {
+                handle_logging_selection(&app, logging_item);
+            }
+        }
         "restart" => {
             app.restart();
         }
         _ => {
-            eprintln!("Warning: Unhandled menu item: {:?}", id);
+            error!("Unhandled menu item: {:?}", id);
         }
     }
 }
@@ -112,7 +119,7 @@ pub fn create_tray_menu<R: Runtime>(app: &AppHandle<R>) -> (Menu<R>, MenuState<R
     if config_manager.config_exists("settings") {
         match config_manager.load_config("settings") {
             Ok(config) => whispr_config = config,
-            Err(e) => eprintln!("Failed to load configuration: {}", e),
+            Err(e) => error!("Failed to load configuration: {}", e),
         }
     }
 
@@ -129,7 +136,7 @@ pub fn create_tray_menu<R: Runtime>(app: &AppHandle<R>) -> (Menu<R>, MenuState<R
             audio_device_map.insert(device.to_string(), item);
         }
     } else {
-        eprintln!("Failed to get list of input devices");
+        error!("Failed to get list of input devices");
     }
 
     let audio_device_refs: Vec<&dyn tauri::menu::IsMenuItem<R>> = audio_device_items.iter()
@@ -164,7 +171,7 @@ pub fn create_tray_menu<R: Runtime>(app: &AppHandle<R>) -> (Menu<R>, MenuState<R
         None::<String>
     ).unwrap();
     
-    let whisper_logging_item = CheckMenuItem::with_id( // New item for Whisper logging
+    let whisper_logging_item = CheckMenuItem::with_id(
         app,
         "whisper_logging",
         "Whisper Logging",
@@ -175,6 +182,15 @@ pub fn create_tray_menu<R: Runtime>(app: &AppHandle<R>) -> (Menu<R>, MenuState<R
 
     let restart = MenuItem::with_id(app, "restart", "Restart".to_string(), true, None::<String>).unwrap();
 
+    let logging_item = CheckMenuItem::with_id(
+        app,
+        "logging",
+        "Logging",
+        true,
+        whispr_config.developer.logging,
+        None::<String>
+    ).unwrap();
+
     let developer_options_submenu = Submenu::with_items(
         app,
         "Developer Options",
@@ -182,6 +198,7 @@ pub fn create_tray_menu<R: Runtime>(app: &AppHandle<R>) -> (Menu<R>, MenuState<R
         &[
             &save_recordings_item as &dyn tauri::menu::IsMenuItem<R>,
             &whisper_logging_item as &dyn tauri::menu::IsMenuItem<R>,
+            &logging_item as &dyn tauri::menu::IsMenuItem<R>,
             &restart as &dyn tauri::menu::IsMenuItem<R>
         ]
     ).unwrap();
@@ -276,7 +293,8 @@ pub fn create_tray_menu<R: Runtime>(app: &AppHandle<R>) -> (Menu<R>, MenuState<R
         language_items: language_check_items,
         translate_item: Some(translate_item),
         start_at_login_item: Some(start_at_login_item),
-        whisper_logging_item: Some(whisper_logging_item), // Include Whisper logging item in state
+        whisper_logging_item: Some(whisper_logging_item),
+        logging_item: Some(logging_item),
         keyboard_shortcut_items: keyboard_shortcut_check_items,
     };
     
@@ -287,7 +305,7 @@ fn handle_audio_device_selection<R: Runtime>(app: &AppHandle<R>, id: &str, audio
     if let Some(app_state) = app.try_state::<crate::AppState>() {
         let mut audio_manager = app_state.audio.lock().unwrap();
         if let Err(e) = audio_manager.set_input_device(id) {
-            eprintln!("Failed to set input device: {}", e);
+            error!("Failed to set input device: {}", e);
             if let Ok(current_device) = audio_manager.get_current_device_name() {
                 for (device_id, item) in audio_device_map {
                     item.set_checked(device_id == &current_device).unwrap();
@@ -305,7 +323,7 @@ fn handle_audio_device_selection<R: Runtime>(app: &AppHandle<R>, id: &str, audio
             }
             whispr_config.audio.device_name = Some(id.to_string());
             if let Err(e) = config_manager.save_config(&whispr_config, "settings") {
-                eprintln!("Failed to save configuration: {}", e);
+                error!("Failed to save configuration: {}", e);
             }
         }
     }
@@ -317,10 +335,10 @@ fn handle_remove_silence_selection<R: Runtime>(app: &AppHandle<R>, remove_silenc
         let current_state = audio_manager.is_silence_removal_enabled();
         let new_state = !current_state;
         
-        println!("Remove Silence before toggle: {}", current_state);
+        debug!("Remove Silence before toggle: {}", current_state);
         audio_manager.set_remove_silence(new_state);
         remove_silence_item.set_checked(new_state).unwrap();
-        println!("Remove Silence after toggle: {}", new_state);
+        debug!("Remove Silence after toggle: {}", new_state);
 
         let config_manager = ConfigManager::<WhisprConfig>::new("settings").expect("Failed to create config manager");
         let mut whispr_config = WhisprConfig::default();
@@ -329,7 +347,7 @@ fn handle_remove_silence_selection<R: Runtime>(app: &AppHandle<R>, remove_silenc
         }
         whispr_config.audio.remove_silence = new_state;
         if let Err(e) = config_manager.save_config(&whispr_config, "settings") {
-            eprintln!("Failed to save configuration: {}", e);
+            error!("Failed to save configuration: {}", e);
         }
     }
 }
@@ -341,20 +359,20 @@ fn handle_save_recordings_selection<R: Runtime>(_app: &AppHandle<R>, save_record
     if config_manager.config_exists("settings") {
         match config_manager.load_config("settings") {
             Ok(config) => whispr_config = config,
-            Err(e) => eprintln!("Failed to load configuration: {}", e),
+            Err(e) => error!("Failed to load configuration: {}", e),
         }
     }
 
     let current_state = whispr_config.developer.save_recordings;
     let new_state = !current_state;
 
-    println!("Save Recordings before toggle: {}", current_state);
+    debug!("Save Recordings before toggle: {}", current_state);
     save_recordings_item.set_checked(new_state).unwrap();
-    println!("Save Recordings after toggle: {}", new_state);
+    debug!("Save Recordings after toggle: {}", new_state);
 
     whispr_config.developer.save_recordings = new_state;
     if let Err(e) = config_manager.save_config(&whispr_config, "settings") {
-        eprintln!("Failed to save configuration: {}", e);
+        error!("Failed to save configuration: {}", e);
     }
 }
 
@@ -365,47 +383,47 @@ fn handle_whisper_logging_selection<R: Runtime>(_app: &AppHandle<R>, whisper_log
     if config_manager.config_exists("settings") {
         match config_manager.load_config("settings") {
             Ok(config) => whispr_config = config,
-            Err(e) => eprintln!("Failed to load configuration: {}", e),
+            Err(e) => error!("Failed to load configuration: {}", e),
         }
     }
 
     let current_state = whispr_config.developer.whisper_logging;
     let new_state = !current_state;
 
-    println!("Whisper Logging before toggle: {}", current_state);
+    debug!("Whisper Logging before toggle: {}", current_state);
     whisper_logging_item.set_checked(new_state).unwrap();
-    println!("Whisper Logging after toggle: {}", new_state);
+    debug!("Whisper Logging after toggle: {}", new_state);
 
     whispr_config.developer.whisper_logging = new_state;
     if let Err(e) = config_manager.save_config(&whispr_config, "settings") {
-        eprintln!("Failed to save configuration: {}", e);
+        error!("Failed to save configuration: {}", e);
     }
 }
 
 fn handle_language_selection<R: Runtime>(app: &AppHandle<R>, _item: CheckMenuItem<R>, language: &str) {
-    println!("handle_language_selection called with language: {}", language);
+    debug!("handle_language_selection called with language: {}", language);
     let config_manager = ConfigManager::<WhisprConfig>::new("settings").expect("Failed to create config manager");
-    println!("ConfigManager created");
+    debug!("ConfigManager created");
     let mut whispr_config = WhisprConfig::default();
-    println!("WhisprConfig initialized");
+    debug!("WhisprConfig initialized");
 
     if config_manager.config_exists("settings") {
         match config_manager.load_config("settings") {
             Ok(config) => {
                 whispr_config = config;
-                println!("Configuration loaded successfully");
+                debug!("Configuration loaded successfully");
             }
             Err(e) => {
-                eprintln!("Failed to load configuration: {}", e);
+                error!("Failed to load configuration: {}", e);
                 return;
             }
         }
     }
 
     whispr_config.whisper.language = Some(language.to_string());
-    println!("Language updated to: {}", language);
+    debug!("Language updated to: {}", language);
     if let Err(e) = config_manager.save_config(&whispr_config, "settings") {
-        eprintln!("Failed to save configuration: {}", e);
+        error!("Failed to save configuration: {}", e);
         return;
     }
 
@@ -413,7 +431,7 @@ fn handle_language_selection<R: Runtime>(app: &AppHandle<R>, _item: CheckMenuIte
     for (item_id, menu_item) in &menu_state.language_items {
         menu_item.set_checked(item_id.strip_prefix("language_").unwrap() == language).unwrap();
     }
-    println!("Menu items updated");
+    debug!("Menu items updated");
 }
 
 fn handle_translate_selection<R: Runtime>(_app: &AppHandle<R>, translate_item: &CheckMenuItem<R>) {
@@ -423,25 +441,25 @@ fn handle_translate_selection<R: Runtime>(_app: &AppHandle<R>, translate_item: &
     if config_manager.config_exists("settings") {
         match config_manager.load_config("settings") {
             Ok(config) => whispr_config = config,
-            Err(e) => eprintln!("Failed to save configuration: {}", e),
+            Err(e) => error!("Failed to save configuration: {}", e),
         }
     }
 
     let current_state = whispr_config.whisper.translate;
     let new_state = !current_state;
 
-    println!("Translate before toggle: {}", current_state);
+    debug!("Translate before toggle: {}", current_state);
     translate_item.set_checked(new_state).unwrap();
-    println!("Translate after toggle: {}", new_state);
+    debug!("Translate after toggle: {}", new_state);
 
     whispr_config.whisper.translate = new_state;
     if let Err(e) = config_manager.save_config(&whispr_config, "settings") {
-        eprintln!("Failed to save configuration: {}", e);
+        error!("Failed to save configuration: {}", e);
     }
 }
 
 fn handle_start_at_login_selection<R: Runtime>(app: &AppHandle<R>, start_at_login_item: &CheckMenuItem<R>) {
-    println!("Start at login selection handler called");
+    debug!("Start at login selection handler called");
     
     let config_manager = ConfigManager::<WhisprConfig>::new("settings").expect("Failed to create config manager");
     let mut whispr_config = WhisprConfig::default();
@@ -449,40 +467,78 @@ fn handle_start_at_login_selection<R: Runtime>(app: &AppHandle<R>, start_at_logi
     if config_manager.config_exists("settings") {
         match config_manager.load_config("settings") {
             Ok(config) => whispr_config = config,
-            Err(e) => eprintln!("Failed to load configuration: {}", e),
+            Err(e) => error!("Failed to load configuration: {}", e),
         }
     }
 
     let current_state = whispr_config.start_at_login;
     let new_state = !current_state;
 
-    println!("Start at login before toggle: {}", current_state);
+    debug!("Start at login before toggle: {}", current_state);
     
     let autolaunch = app.autolaunch();
     let autolaunch_result = if new_state {
-        println!("Enabling autolaunch");
+        debug!("Enabling autolaunch");
         autolaunch.enable()
     } else {
-        println!("Disabling autolaunch");
+        debug!("Disabling autolaunch");
         autolaunch.disable()
     };
 
     if let Err(e) = autolaunch_result {
-        eprintln!("Failed to update autolaunch state: {}", e);
+        error!("Failed to update autolaunch state: {}", e);
         return;
     }
 
     if let Err(e) = start_at_login_item.set_checked(new_state) {
-        eprintln!("Failed to update checkbox state: {}", e);
+        error!("Failed to update checkbox state: {}", e);
         return;
     }
 
-    println!("Start at login after toggle: {}", new_state);
+    debug!("Start at login after toggle: {}", new_state);
 
     whispr_config.start_at_login = new_state;
     if let Err(e) = config_manager.save_config(&whispr_config, "settings") {
-        eprintln!("Failed to save configuration: {}", e);
+        error!("Failed to save configuration: {}", e);
     }
+}
+
+fn handle_logging_selection<R: Runtime>(app: &AppHandle<R>, logging_item: &CheckMenuItem<R>) {
+    let config_manager = ConfigManager::<WhisprConfig>::new("settings").expect("Failed to create config manager");
+    let mut whispr_config = WhisprConfig::default();
+    
+    if config_manager.config_exists("settings") {
+        match config_manager.load_config("settings") {
+            Ok(config) => whispr_config = config,
+            Err(e) => error!("Failed to load configuration: {}", e),
+        }
+    }
+
+    let current_state = whispr_config.developer.logging;
+    let new_state = !current_state;
+    let app_handle = app.clone();
+    let logging_item = logging_item.clone();
+
+    app.dialog()
+        .message("Application must be restarted for changes to take effect")
+        .title("Restart Required")
+        .buttons(MessageDialogButtons::OkCancel)
+        .show(move |answer| {
+            if answer {
+                let mut config = whispr_config.clone();
+                config.developer.logging = new_state;
+                
+                if let Err(e) = config_manager.save_config(&config, "settings") {
+                    error!("Failed to save configuration: {}", e);
+                    return;
+                }
+
+                logging_item.set_checked(new_state).unwrap();
+                app_handle.restart();
+            } else {
+                logging_item.set_checked(current_state).unwrap();
+            }
+        });
 }
 
 fn handle_keyboard_shortcut_selection<R: Runtime>(app: &AppHandle<R>, _item: CheckMenuItem<R>, shortcut: &str) {
@@ -492,7 +548,7 @@ fn handle_keyboard_shortcut_selection<R: Runtime>(app: &AppHandle<R>, _item: Che
     if config_manager.config_exists("settings") {
         match config_manager.load_config("settings") {
             Ok(config) => whispr_config = config,
-            Err(e) => eprintln!("Failed to load configuration: {}", e),
+            Err(e) => error!("Failed to load configuration: {}", e),
         }
     }
 
@@ -510,7 +566,7 @@ fn handle_keyboard_shortcut_selection<R: Runtime>(app: &AppHandle<R>, _item: Che
                 config.keyboard_shortcut = target_shortcut.clone();
                 
                 if let Err(e) = config_manager.save_config(&config, "settings") {
-                    eprintln!("Failed to save configuration: {}", e);
+                    error!("Failed to save configuration: {}", e);
                     return;
                 }
 

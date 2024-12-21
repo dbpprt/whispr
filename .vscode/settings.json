@@ -5,8 +5,12 @@
   "rust-analyzer.cargo.workspaceRoot": "${workspaceFolder}/src-tauri",
   "cSpell.words": [
     "autolaunch",
+    "chrono",
+    "Deque",
     "Enigo",
     "ggml",
+    "samplerate",
+    "Sinc",
     "tauri",
     "thiserror",
     "Whispr"

@@ -1,5 +1,6 @@
 use tauri::{WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 use tauri::utils::WindowEffect;
+use log::{error, info};
 use tauri::utils::config::WindowEffectsConfig;
 
 const WINDOW_TITLE: &str = "whispr:overlay";
@@ -74,35 +75,35 @@ impl OverlayWindow {
     pub fn show(&self) {
         if let Some(window) = &self.window {
             if let Err(e) = self.move_bottom_right(40) {
-                eprintln!("Failed to move window to bottom right: {}", e);
+                error!("Failed to move window to bottom right: {}", e);
             } else if let Err(e) = window.set_skip_taskbar(true) {
-                eprintln!("Failed to set window to skip taskbar: {}", e);
+                error!("Failed to set window to skip taskbar: {}", e);
             } else if let Err(e) = window.set_ignore_cursor_events(true) {
-                eprintln!("Failed to set window to ignore cursor events: {}", e);
+                error!("Failed to set window to ignore cursor events: {}", e);
             } else if let Err(e) = window.show() {
-                eprintln!("Failed to show window: {}", e);
+                error!("Failed to show window: {}", e);
             } else {
-                println!("Window shown successfully");
+                info!("Window shown successfully");
 
                 if let Err(e) = window.hide_menu() {
-                    eprintln!("Failed to hide window menu: {}", e);
+                    error!("Failed to hide window menu: {}", e);
                 }
 
                 if let Err(e) = window.set_always_on_top(true) {
-                    eprintln!("Failed to set window always on top: {}", e);
+                    error!("Failed to set window always on top: {}", e);
                 }
             }
         } else {
-            eprintln!("No window exists to show");
+            error!("No window exists to show");
         }
     }
 
     pub fn hide(&self) {
         if let Some(window) = &self.window {
             if let Err(e) = window.hide().and_then(|_| window.hide_menu()) {
-                eprintln!("Failed to hide window: {}", e);
+                error!("Failed to hide window: {}", e);
             } else {
-                println!("Window hidden successfully");
+                info!("Window hidden successfully");
             }
         }
     }

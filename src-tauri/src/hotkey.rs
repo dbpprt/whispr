@@ -1,4 +1,5 @@
 use cocoa::base::id;
+use log::{info, debug};
 use objc::{class, msg_send, sel, sel_impl};
 use objc::runtime::Sel;
 use anyhow::Result;
@@ -22,9 +23,9 @@ impl HotkeyManager {
     where
         F: Fn(bool) + Send + Sync + 'static,
     {
-        println!("HotkeyManager: Initializing");
+        debug!("HotkeyManager: Initializing");
         let (key_code, key_mask) = Self::get_key_code_and_mask(&config.keyboard_shortcut);
-        println!("HotkeyManager: Using key_code: {}, key_mask: {}, and shortcut: {}", key_code, key_mask, config.keyboard_shortcut);
+        debug!("HotkeyManager: Using key_code: {}, key_mask: {}, and shortcut: {}", key_code, key_mask, config.keyboard_shortcut);
         HotkeyManager {
             monitors: Vec::new(),
             callback: Arc::new(callback),
@@ -58,7 +59,7 @@ impl HotkeyManager {
                     if event_key_code == key_code {
                         let flags: NSUInteger = msg_send![event, modifierFlags];
                         let is_pressed = flags & key_mask != 0;
-                        println!("HotkeyManager: Key - pressed: {}", is_pressed);
+                        debug!("HotkeyManager: Key - pressed: {}", is_pressed);
                         callback(is_pressed);
                     }
                 }
@@ -75,12 +76,12 @@ impl HotkeyManager {
         }
 
         self.monitors.push(monitor as *mut std::ffi::c_void);
-        println!("HotkeyManager: Event monitor created");
+        debug!("HotkeyManager: Event monitor created");
         Ok(())
     }
 
     pub fn start(&mut self) -> Result<()> {
-        println!("HotkeyManager: Starting event monitors");
+        info!("HotkeyManager: Starting event monitors");
         self.add_monitor(sel!(addGlobalMonitorForEventsMatchingMask:handler:))?;
         self.add_monitor(sel!(addLocalMonitorForEventsMatchingMask:handler:))?;
         Ok(())
