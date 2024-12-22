@@ -130,15 +130,9 @@ fn setup_app(app: &mut App<Wry>) -> std::result::Result<(), Box<dyn std::error::
     }
 
     // Initialize Enigo once to prompt for permissions
-    if let Err(e) = Enigo::new(&Settings::default()) {
-        error!("Failed to initialize Enigo: {}", e);
-        app.dialog()
-            .message("Failed to initialize text input. Please grant accessibility permissions.")
-            .kind(MessageDialogKind::Error)
-            .title("Error")
-            .blocking_show();
-        app.handle().exit(1);
-        return Ok(());
+    match Enigo::new(&Settings::default()) {
+        Ok(_) => info!("Successfully initialized Enigo"),
+        Err(e) => warn!("Failed to initialize Enigo: {}", e),
     }
 
     // Initialize application state

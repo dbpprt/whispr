@@ -20,9 +20,12 @@ Summary of changes
 - changes
 - changes
 
-What you write will be passed directly to git commit -m "[message]"
+What you write will be passed directly to `git commit -m "[message]"`
+Do not commit on your own, only when prompted. 
+
+Before executing `git commit -m "[message]"`, do not forget to `git add .`
 </commit_message_rules>
 
 Additional shortcuts:
 - When I say "clippy", execute `npm run clippy` and one by one fix the warnings in a idiomatic way.
-- When I ask you to commit, you execute "git --no-pager diff $1" and write a commit message following <commit_message_rules>.
+- When I ask you to commit, you execute "git --no-pager diff $1" and write a commit message following <commit_message_rules>. 
