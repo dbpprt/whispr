@@ -34,12 +34,13 @@ Whispr is a macOS menubar application written in Rust for local voice-to-text tr
      <img src="docs/assets/menubar.png" alt="Whispr Menubar Configuration" width="300">
    </div>
 
-## 🛠️ Technical Details
+## Known Issues
 
-Whispr is built with:
-- Rust (Tauri v2)
-- Whisper.cpp for local speech recognition
-- React + TypeScript for the UI components
+- Startup experience is pretty rough, downloading the model and granting permissions.
+- Silence removal is not tweaked yet and it is static, ideally it should be dynamic.
+- Sometimes when right-clicking the menu bar icon, the menu doesn't open but flickers.
+- Manually downloading the model is painful.
+- The overlay lags when Whisper runs.
 
 ## ⚙️ Configuration
 
@@ -118,15 +119,6 @@ The advanced configuration for Whispr is located in `~/.whispr/settings.json`. B
 - [ ] GitHub Actions for Builds and Releases
 - [ ] Automate builds/releases using GitHub Actions.
 - [ ] Brew formulae
-
-## Known Issues
-
-- Silence removal is not tweaked yet and it is static, ideally it should be dynamic.
-- Sometimes when right-clicking the menu bar icon, the menu doesn't open but flickers.
-- Manually downloading the model is painful.
-- The overlay lags when Whisper runs.
-- This is my first Rust project, built over a weekend, so the code is far from perfect.
-- Many unnecessary comments, with fewer useful ones, mainly by Qwen..
 
 ## Contributing
 
