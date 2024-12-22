@@ -6,12 +6,14 @@
   "cSpell.words": [
     "autolaunch",
     "chrono",
+    "clippy",
     "Deque",
     "Enigo",
     "ggml",
     "samplerate",
     "Sinc",
     "tauri",
+    "termcolor",
     "thiserror",
     "Whispr"
   ]

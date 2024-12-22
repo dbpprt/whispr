@@ -5,14 +5,9 @@ use tauri::utils::config::WindowEffectsConfig;
 
 const WINDOW_TITLE: &str = "whispr:overlay";
 
+#[derive(Default)]
 pub struct OverlayWindow {
     window: Option<WebviewWindow>,
-}
-
-impl Default for OverlayWindow {
-    fn default() -> Self {
-        Self { window: None }
-    }
 }
 
 impl OverlayWindow {

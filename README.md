@@ -108,6 +108,8 @@ The advanced configuration for Whispr is located in `~/.whispr/settings.json`. B
 ## Roadmap
 
 - [ ] Model Management: Automated model downloads
+- [ ] Headless experience & redesign status icon
+  - The overlay is actually not needed at all, add a headless mode, use menubar icon coloring as recording indicator.
 - [ ] Meeting mode with diarization and system audio recording
   - Memo: https://github.com/Mnpn/Azayaka/blob/main/Azayaka/Recording.swift, https://github.com/insidegui/AudioCap/blob/main/AudioCap/ProcessTap/CoreAudioUtils.swift
 - [ ] Application context awareness

@@ -48,7 +48,7 @@ pub fn handle_menu_event<R: Runtime>(app: AppHandle<R>, id: &str, menu_state: &M
         }
         "about" => {
             let _ = app.shell().command("open")
-                .args(&["https://github.com/dbpprt/whispr"])
+                .args(["https://github.com/dbpprt/whispr"])
                 .spawn();
         }
         id if id.starts_with("language_") => {
@@ -111,7 +111,7 @@ pub fn handle_menu_event<R: Runtime>(app: AppHandle<R>, id: &str, menu_state: &M
 
 pub fn create_tray_menu<R: Runtime>(app: &AppHandle<R>) -> (Menu<R>, MenuState<R>) {
     let separator = PredefinedMenuItem::separator(app).unwrap();
-    let quit = MenuItem::with_id(app, "quit", "Quit".to_string(), true, None::<String>).unwrap();
+    let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<String>).unwrap();
 
     let config_manager = ConfigManager::<WhisprConfig>::new("settings").expect("Failed to create config manager");
     let mut whispr_config = WhisprConfig::default();
@@ -180,7 +180,7 @@ pub fn create_tray_menu<R: Runtime>(app: &AppHandle<R>) -> (Menu<R>, MenuState<R
         None::<String>
     ).unwrap();
 
-    let restart = MenuItem::with_id(app, "restart", "Restart".to_string(), true, None::<String>).unwrap();
+    let restart = MenuItem::with_id(app, "restart", "Restart", true, None::<String>).unwrap();
 
     let logging_item = CheckMenuItem::with_id(
         app,
@@ -268,7 +268,7 @@ pub fn create_tray_menu<R: Runtime>(app: &AppHandle<R>) -> (Menu<R>, MenuState<R
         &keyboard_shortcut_menu_items
     ).unwrap();
 
-    let about = MenuItem::with_id(app, "about", "About".to_string(), true, None::<String>).unwrap();
+    let about = MenuItem::with_id(app, "about", "About", true, None::<String>).unwrap();
 
     let main_items: Vec<&dyn tauri::menu::IsMenuItem<R>> = vec![
         &quit,

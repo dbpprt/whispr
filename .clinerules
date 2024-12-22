@@ -3,16 +3,26 @@ Important Rules:
 - Important: we use tauri v2 not v1, there are many breaking changes!
 - Do not write doc strings or unnecessary comments. Only comment really complex parts of the code.
 
-Git Commit Message Rules:
-- All commit messages must follow the conventional commit format
-- Start with one of these types followed by a colon and space:
-  * feat: New features or significant additions
-  * fix: Bug fixes or error corrections
-  * chore: Routine tasks, maintenance, or tooling changes
-- After the type, write a concise description in present tense
-- Keep the first line under 72 characters
-- Use imperative mood ("add" not "adds" or "added")
-- Examples:
-  * feat: add global hotkey support
-  * fix: resolve memory leak in audio capture
-  * chore: update dependencies to latest versions
+<commit_message_rules>
+Write short commit messages:
+- The first line should be a short summary of the changes
+- Remember to mention the files that were changed, and what was changed
+- Explain the 'why' behind changes
+- Use bullet points for multiple changes
+- Tone: Use a LOT of emojis, be funny, and expressive. Feel free to be profane, but don't be offensive
+- If there are no changes, or the input is blank - then return a blank string
+
+Think carefully before you write your commit message.
+
+The output format should be:
+
+Summary of changes
+- changes
+- changes
+
+What you write will be passed directly to git commit -m "[message]"
+</commit_message_rules>
+
+Additional shortcuts:
+- When I say "clippy", execute `npm run clippy` and one by one fix the warnings in a idiomatic way.
+- When I ask you to commit, you execute "git --no-pager diff $1" and write a commit message following <commit_message_rules>.

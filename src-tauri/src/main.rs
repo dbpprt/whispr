@@ -56,14 +56,14 @@ struct AppState {
 impl AppState {
     fn new(config: WhisprConfig) -> Result<Self> {
         let audio_manager = AudioManager::new()
-            .map_err(|e| WhisprError::AudioError(e.to_string()))?;
+            .map_err(|e| WhisprError::ConfigError(e.to_string()))?;
         
         let model_path = dirs::home_dir()
             .ok_or_else(|| WhisprError::SystemError("Could not find home directory".to_string()))?
             .join(".whispr")
             .join("model.bin");
         let whisper = WhisperProcessor::new(&model_path, config)
-            .map_err(|e| WhisprError::WhisperError(e))?;
+            .map_err(WhisprError::WhisperError)?;
      
         Ok(Self {
             whisper,
@@ -102,7 +102,7 @@ fn setup_app(app: &mut App<Wry>) -> std::result::Result<(), Box<dyn std::error::
             .blocking_show();
         
         let _ = app.shell().command("open")
-            .args(&["https://github.com/dbpprt/whispr?tab=readme-ov-file#usage"])
+            .args(["https://github.com/dbpprt/whispr?tab=readme-ov-file#usage"])
             .spawn();
 
         app.handle().exit(1);
@@ -146,16 +146,16 @@ fn setup_app(app: &mut App<Wry>) -> std::result::Result<(), Box<dyn std::error::
     state.configure_audio(&whispr_config)?;
     
     // Create window
-    state.overlay.lock().unwrap().create_window(&app_handle);
+    state.overlay.lock().unwrap().create_window(app_handle);
     
     // Store state
     app.manage(state);
 
     // Setup tray and menu
-    let (tray_menu, menu_state) = create_tray_menu(&app_handle);
+    let (tray_menu, menu_state) = create_tray_menu(app_handle);
     app.manage(menu_state);
 
-    let handle_clone = app_handle.clone();
+    let handle_clone = app.handle().clone();
     let tray = tauri::tray::TrayIconBuilder::new()
         .icon(app_handle.default_window_icon().unwrap().clone())
         .menu_on_left_click(false)
@@ -164,13 +164,13 @@ fn setup_app(app: &mut App<Wry>) -> std::result::Result<(), Box<dyn std::error::
             let menu_state = handle_clone.state::<MenuState<_>>();
             crate::menu::handle_menu_event(app.clone(), &event.id().0, &menu_state);
         })
-        .build(app_handle)
+        .build(app.handle())
         .map_err(|e| Box::new(WhisprError::SystemError(e.to_string())) as Box<dyn std::error::Error>)?;
     
     app.manage(tray);
 
     // Setup hotkey manager
-    let app_handle_clone = app_handle.clone();
+    let app_handle_clone = app.handle().clone();
     let mut hotkey_manager = HotkeyManager::new(move |is_speaking| {
         if let Some(state) = app_handle_clone.try_state::<AppState>() {
             let overlay = state.overlay.lock().unwrap();
