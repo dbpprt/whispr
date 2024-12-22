@@ -20,6 +20,11 @@
     "macOS": {
       "entitlements": "./Entitlements.plist"
     },
+    "resources": [
+      "icons/tray/tray_32.png",
+      "icons/tray/tray_128.png",
+      "icons/tray/tray_512.png"
+    ],
     "active": true,
     "targets": [
       "dmg"

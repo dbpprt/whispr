@@ -11,7 +11,7 @@ mod logging;
 
 use log::{error, warn, info, debug};
 use std::sync::{Arc, Mutex};
-use tauri::{Manager, App, Wry, Emitter};
+use tauri::{image::Image, path::BaseDirectory, App, Emitter, Manager, Wry};
 use std::time::{Duration, Instant};
 use tokio::sync::Semaphore;
 use enigo::{Enigo, Keyboard, Settings};
@@ -149,9 +149,12 @@ fn setup_app(app: &mut App<Wry>) -> std::result::Result<(), Box<dyn std::error::
     let (tray_menu, menu_state) = create_tray_menu(app_handle);
     app.manage(menu_state);
 
+    // this should be next only
+    let icon_resource_path = app.path().resolve("icons/tray/tray_128.png", BaseDirectory::Resource)?;
     let handle_clone = app.handle().clone();
+
     let tray = tauri::tray::TrayIconBuilder::new()
-        .icon(app_handle.default_window_icon().unwrap().clone())
+        .icon(Image::from_path(icon_resource_path)?) // <- this is next
         .menu_on_left_click(false)
         .menu(&tray_menu)
         .on_menu_event(move |app, event| {
@@ -160,7 +163,7 @@ fn setup_app(app: &mut App<Wry>) -> std::result::Result<(), Box<dyn std::error::
         })
         .build(app.handle())
         .map_err(|e| Box::new(WhisprError::SystemError(e.to_string())) as Box<dyn std::error::Error>)?;
-    
+
     app.manage(tray);
 
     // Setup hotkey manager
