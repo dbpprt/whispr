@@ -129,6 +129,18 @@ fn setup_app(app: &mut App<Wry>) -> std::result::Result<(), Box<dyn std::error::
         }
     }
 
+    // Initialize Enigo once to prompt for permissions
+    if let Err(e) = Enigo::new(&Settings::default()) {
+        error!("Failed to initialize Enigo: {}", e);
+        app.dialog()
+            .message("Failed to initialize text input. Please grant accessibility permissions.")
+            .kind(MessageDialogKind::Error)
+            .title("Error")
+            .blocking_show();
+        app.handle().exit(1);
+        return Ok(());
+    }
+
     // Initialize application state
     let state = AppState::new(whispr_config.clone())?;
     state.configure_audio(&whispr_config)?;
@@ -212,6 +224,7 @@ fn setup_app(app: &mut App<Wry>) -> std::result::Result<(), Box<dyn std::error::
                                 .join(" ");
                             info!("Transcription: {}", transcription);
 
+                            // Create a new Enigo instance for text input
                             let mut enigo = match Enigo::new(&Settings::default()) {
                                 Ok(enigo) => enigo,
                                 Err(e) => {
