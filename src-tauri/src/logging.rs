@@ -102,8 +102,3 @@ pub fn setup_logging() -> anyhow::Result<()> {
 
     Ok(())
 }
-
-pub fn get_log_dir() -> anyhow::Result<PathBuf> {
-    let home_dir = dirs::home_dir().ok_or_else(|| anyhow::anyhow!("Could not find home directory"))?;
-    Ok(home_dir.join(".whispr").join("logs"))
-}

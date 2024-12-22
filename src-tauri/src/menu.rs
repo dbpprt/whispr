@@ -2,7 +2,7 @@ use tauri::{
     AppHandle, Manager, Runtime,
     menu::{Menu, MenuItem, Submenu, CheckMenuItem, PredefinedMenuItem},
 };
-use log::{error, info, debug, warn};
+use log::{error, info, debug};
 use std::collections::HashMap;
 use crate::audio::AudioManager;
 use crate::config::{ConfigManager, WhisprConfig};
