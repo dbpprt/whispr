@@ -51,13 +51,13 @@ impl WhisperProcessor {
         let mut segments = Vec::new();
         for i in 0..num_segments {
             let segment = state.full_get_segment_text(i)
-                .map_err(|e| e.to_string())?;
+                .map_err(|e| e.to_string())?.trim().into();
             let start = state.full_get_segment_t0(i)
                 .map_err(|e| e.to_string())? as f32;
             let end = state.full_get_segment_t1(i)
                 .map_err(|e| e.to_string())? as f32;
 
-            info!("[{} - {}]: {}", start, end, segment);
+            info!("[{} - {}]: \"{}\"", start, end, segment);
             segments.push((start, end, segment));
         }
         Ok(segments)
