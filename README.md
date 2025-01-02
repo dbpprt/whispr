@@ -16,6 +16,7 @@ Whispr is a macOS menubar application written in Rust for local voice-to-text tr
 - Menubar integration
 - Configurable input and models
 - Remove silence to prevent hallucination
+- Custom vocabulary/dictionary based on config (to improve transcription quality with 'uncommon' words)
 
 ## Usage
 
@@ -93,7 +94,8 @@ The advanced configuration for Whispr is located in `~/.whispr/settings.json`. B
   "whisper": {
     "model_name": "base.en",
     "language": "auto",
-    "translate": false
+    "translate": false,
+    "dictionary": ["USail", "CustomWord"]
   },
   "start_at_login": false,
   "keyboard_shortcut": "right_command_key",
@@ -117,7 +119,7 @@ The advanced configuration for Whispr is located in `~/.whispr/settings.json`. B
   - [ ] MLX-powered LLM post-processing
   - [ ] Apple Vision API integration
 - [ ] Add Windows support
-- [ ] Vocabulary and replacements
+- [ ] Replacements
 - [ ] GitHub Actions for Builds and Releases
 - [ ] Automate builds/releases using GitHub Actions.
 - [ ] Brew formulae

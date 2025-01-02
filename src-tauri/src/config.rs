@@ -179,6 +179,7 @@ pub struct WhisperSettings {
     pub model_name: String,
     pub language: Option<String>,
     pub translate: bool,
+    pub dictionary: Option<Vec<String>>,
 }
 
 impl Default for WhisperSettings {
@@ -187,6 +188,7 @@ impl Default for WhisperSettings {
             model_name: "base.en".to_string(),
             language: None,
             translate: false,
+            dictionary: None,
         }
     }
 }

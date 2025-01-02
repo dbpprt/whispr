@@ -38,6 +38,13 @@ impl WhisperProcessor {
         let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 1 });
         params.set_language(self.config.whisper.language.as_deref());
         params.set_translate(self.config.whisper.translate);
+        if let Some(dict) = &self.config.whisper.dictionary {
+            if !dict.is_empty() {
+                let prompt = format!("This audio uses specialized terms including: {}. Please use their exact writing.", dict.join(", "));
+                info!("Prompt based on dict: {}", &prompt);
+                params.set_initial_prompt(&prompt);
+            }
+        }
 
         let mut state = self.ctx.create_state()
             .map_err(|e| e.to_string())?;
