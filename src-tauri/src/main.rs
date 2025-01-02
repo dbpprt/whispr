@@ -212,10 +212,16 @@ fn setup_app(app: &mut App<Wry>) -> std::result::Result<(), Box<dyn std::error::
                                 return;
                             }
                             
-                            let transcription: String = segments.iter()
+                            let mut transcription: String = segments.iter()
                                 .map(|(_, _, segment)| segment.clone())
                                 .collect::<Vec<String>>()
                                 .join(" ");
+                            // Add trailing space if last character is punctuation, allowing for "chaining" of recordings
+                            if let Some(last_char) = transcription.chars().last() {
+                                if last_char.is_ascii_punctuation() {
+                                    transcription.push(' ');
+                                }
+                            }
                             info!("Transcription: {}", transcription);
 
                             // Create a new Enigo instance for text input
